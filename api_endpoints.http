@@ -1,0 +1,70 @@
+@address = http://localhost:3001
+@dataset_path = pipeline1
+
+### Create new pipeline
+# POST {{address}}/submit_pipeline HTTP/1.1
+# content-type: application/json
+
+# {
+#   "pipeline_hash": "1",
+#   "name": "pipeline1",
+#   "input_dataset": "test_dataset",
+#   "input_dataset_commit_hash": "ujhjvWzzDhBH8eqMk2jtbKfhUDjwovff",
+#   "fragmenter_image": "localhost:32000/fragmenter:3",
+#   "fragmenter_output_channel": "step1_input",
+#   "steps": [
+#       {"name": "new-step1", "image": "localhost:32000/transformation-step:3", "input_channel": "step1_input", "output_channel": "step1_output"},
+#       {"name": "new-step2", "image": "localhost:32000/transformation-step:3", "input_channel": "step1_output", "output_channel": "step2_output"}
+#   ],
+#   "combiner_input_channel": "step2_output"
+# }
+
+
+
+@pipeline_hash = 1
+### Create new pipeline actor
+POST {{address}}/submit_pipeline_actor HTTP/1.1
+content-type: application/json
+
+{
+  "pipeline_hash": "{{pipeline_hash}}",
+  "name": "pipeline1",
+  "input_dataset": "test_dataset",
+  "input_dataset_commit_hash": "afong990j9QV7nB8ZiBRlhb3yspXjvgZ",
+  "fragmenter_image": "localhost:32000/fragmenter:5",
+  "fragmenter_output_channel": "step1_input",
+  "steps": [
+      {"name": "new-step1", "image": "localhost:32000/transformation-step:6", "input_channel": "step1_input", "output_channel": "step1_output"},
+      {"name": "new-step2", "image": "localhost:32000/transformation-step:6", "input_channel": "step1_output", "output_channel": "step2_output"}
+  ],
+  "combiner_input_channel": "step2_output"
+}
+
+
+### Create new provenance
+POST {{address}}/dummy/pipeline/{{{{pipeline_hash}}}}/lineage/1 HTTP/1.1
+content-type: application/json
+
+{
+  "transformation_step": "banaan",
+  "predecessors": ["2"]
+}
+
+
+### Get upstream status
+GET {{address}}/pipeline/{{pipeline_hash}}/{{pipeline_hash}}-new-step1/upstream_finished HTTP/1.1
+
+
+### Get pods
+GET {{address}}/get_pods HTTP/1.1
+
+
+### Get jobs
+GET {{address}}/get_jobs HTTP/1.1
+
+
+### Get status
+GET {{address}}/pipeline/hello/status HTTP/1.1
+
+### Delete pipeline
+DELETE {{address}}/delete_pipelines HTTP/1.1

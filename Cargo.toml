@@ -1,0 +1,33 @@
+[package]
+name = "manager"
+version = "0.1.0"
+authors = ["Mark <marktmmrmn@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "manager"
+path = "src/main.rs"
+
+[dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+async-std = "1.4.0"
+log = "0.4.0"
+env_logger = "0.7.1"
+dotenv = "0.15.0"
+rand = "0.7.3"
+bytes = "0.5.4"
+actix = "0.9.0"
+actix-web-actors = "2.0.0"
+actix-web = "2.0.0"
+actix-rt = "1.0.0"
+listenfd = "0.3"
+json = "*"
+serde = "1.0.1"
+serde_json = "1.0"
+amiquip = "0.3.3"
+kube = "0.32.1"
+kube-derive = "0.32.1"
+k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
+futures = "0.3.4"
