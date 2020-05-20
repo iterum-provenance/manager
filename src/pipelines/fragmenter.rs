@@ -5,17 +5,17 @@ use serde_json::json;
 use std::env;
 
 pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, ManagerError> {
-    let hash = format!("{}-fragmenter", &pipeline_job.pipeline_hash);
-    let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_hash);
+    let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
+    let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_run_hash);
     let output_queue = format!(
         "{}-{}",
-        &pipeline_job.pipeline_hash, &pipeline_job.fragmenter_output_channel
+        &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter_output_channel
     );
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": hash, "labels": {"pipeline_hash": pipeline_job.pipeline_hash} },
+        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
         "spec": {
             "parallelism": 1,
             "template": {
@@ -32,7 +32,7 @@ pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, Man
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &hash},
-                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_hash},
+                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_run_hash},
 
                             {"name": "DAEMON_URL", "value": env::var("DAEMON_URL").unwrap()},
                             {"name": "DAEMON_DATASET", "value": &pipeline_job.input_dataset},

@@ -1,11 +1,12 @@
 use crate::pipelines::lifecycle::actor::PipelineActor;
+use crate::pipelines::lifecycle::actor::StopMessage;
 use actix::prelude::*;
 use actix::Addr;
-
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 pub struct NewPipelineMessage {
-    pub pipeline_hash: String,
+    pub pipeline_run_hash: String,
     pub address: Addr<PipelineActor>,
 }
 
@@ -35,21 +36,32 @@ impl Handler<NewPipelineMessage> for PipelineManager {
     fn handle(&mut self, msg: NewPipelineMessage, _ctx: &mut Context<Self>) -> Self::Result {
         info!(
             "Added actor address of pipeline with hash {}",
-            msg.pipeline_hash
+            msg.pipeline_run_hash
         );
-        if !self.addresses.contains_key(&msg.pipeline_hash) {
-            info!("Actor addres does not exist in map yet. Adding it.");
-            self.addresses.insert(msg.pipeline_hash, msg.address);
-            true
-        } else {
-            info!("Actor address already exists in map.");
-            false
+        // let entry = self.addresses.entry(msg.pipeline_run_hash.to_string());
+        match self.addresses.entry(msg.pipeline_run_hash) {
+            Entry::Occupied(mut old) => {
+                error!("Actor address already exists in map. This should not happen.");
+                error!("Replacing the actor address and killing the one already present.");
+                Arbiter::spawn(send_stop_message(old.get().clone()));
+                old.insert(msg.address);
+                false
+            }
+            Entry::Vacant(v) => {
+                info!("Actor addres does not exist in map yet. Adding it.");
+                v.insert(msg.address);
+                true
+            }
         }
     }
 }
 
+async fn send_stop_message(address: Addr<PipelineActor>) {
+    address.send(StopMessage {}).await.unwrap();
+}
+
 pub struct RequestAddress {
-    pub pipeline_hash: String,
+    pub pipeline_run_hash: String,
 }
 
 impl Message for RequestAddress {
@@ -57,22 +69,41 @@ impl Message for RequestAddress {
 }
 
 impl Handler<RequestAddress> for PipelineManager {
-    // type Error
-    // type Future = Ready<Result<HttpResponse, Error>>;
     type Result = Option<Addr<PipelineActor>>;
 
     fn handle(&mut self, msg: RequestAddress, _ctx: &mut Context<Self>) -> Self::Result {
         info!(
             "Manager returns address of actor of pipeline with hash {}",
-            msg.pipeline_hash
+            msg.pipeline_run_hash
         );
 
-        match self.addresses.get(&msg.pipeline_hash) {
+        match self.addresses.get(&msg.pipeline_run_hash) {
             Some(address) => Some(address.clone()),
             None => {
                 info!("Pipeline manager could not retrieve address.");
                 None
             }
         }
+    }
+}
+
+pub struct RemoveActorFromMapMessage {
+    pub pipeline_run_hash: String,
+}
+
+impl Message for RemoveActorFromMapMessage {
+    type Result = bool;
+}
+
+impl Handler<RemoveActorFromMapMessage> for PipelineManager {
+    type Result = bool;
+
+    fn handle(&mut self, msg: RemoveActorFromMapMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        info!(
+            "Manager removes actor from pipeline hash {} from the hashmap.",
+            msg.pipeline_run_hash
+        );
+
+        self.addresses.remove(&msg.pipeline_run_hash).is_some()
     }
 }

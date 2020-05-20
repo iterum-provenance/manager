@@ -6,7 +6,7 @@
 # content-type: application/json
 
 # {
-#   "pipeline_hash": "1",
+#   "pipeline_run_hash": "1",
 #   "name": "pipeline1",
 #   "input_dataset": "test_dataset",
 #   "input_dataset_commit_hash": "ujhjvWzzDhBH8eqMk2jtbKfhUDjwovff",
@@ -21,28 +21,27 @@
 
 
 
-@pipeline_hash = 1
+# @pipeline_run_hash = 6
 ### Create new pipeline actor
 POST {{address}}/submit_pipeline_actor HTTP/1.1
 content-type: application/json
 
 {
-  "pipeline_hash": "{{pipeline_hash}}",
   "name": "pipeline1",
   "input_dataset": "test_dataset",
-  "input_dataset_commit_hash": "afong990j9QV7nB8ZiBRlhb3yspXjvgZ",
-  "fragmenter_image": "localhost:32000/fragmenter:5",
+  "input_dataset_commit_hash": "eDputXUoj4K1xPViRVAUduEHtJKRMyPY",
+  "fragmenter_image": "iterum/fragmenter:latest",
   "fragmenter_output_channel": "step1_input",
   "steps": [
-      {"name": "new-step1", "image": "localhost:32000/transformation-step:6", "input_channel": "step1_input", "output_channel": "step1_output"},
-      {"name": "new-step2", "image": "localhost:32000/transformation-step:6", "input_channel": "step1_output", "output_channel": "step2_output"}
+      {"name": "new-step1", "image": "iterum/transformation-step:latest", "input_channel": "step1_input", "output_channel": "step1_output"},
+      {"name": "new-step2", "image": "iterum/transformation-step:latest", "input_channel": "step1_output", "output_channel": "step2_output"}
   ],
   "combiner_input_channel": "step2_output"
 }
 
 
 ### Create new provenance
-POST {{address}}/dummy/pipeline/{{{{pipeline_hash}}}}/lineage/1 HTTP/1.1
+POST {{address}}/dummy/pipeline/{{{{pipeline_run_hash}}}}/lineage/1 HTTP/1.1
 content-type: application/json
 
 {
@@ -52,7 +51,7 @@ content-type: application/json
 
 
 ### Get upstream status
-GET {{address}}/pipeline/{{pipeline_hash}}/{{pipeline_hash}}-new-step1/upstream_finished HTTP/1.1
+GET {{address}}/pipeline/{{pipeline_run_hash}}/{{pipeline_run_hash}}-new-step1/upstream_finished HTTP/1.1
 
 
 ### Get pods
@@ -68,3 +67,6 @@ GET {{address}}/pipeline/hello/status HTTP/1.1
 
 ### Delete pipeline
 DELETE {{address}}/delete_pipelines HTTP/1.1
+
+### List queues
+GET {{address}}/list_queues HTTP/1.1

@@ -5,15 +5,15 @@ use serde_json::json;
 use std::env;
 
 pub fn create_combiner_template(pipeline_job: &PipelineJob) -> Result<Job, ManagerError> {
-    let hash = format!("{}-combiner", &pipeline_job.pipeline_hash);
+    let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
     let input_queue = format!(
         "{}-{}",
-        &pipeline_job.pipeline_hash, &pipeline_job.combiner_input_channel
+        &pipeline_job.pipeline_run_hash, &pipeline_job.combiner_input_channel
     );
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": hash, "labels": {"pipeline_hash": pipeline_job.pipeline_hash} },
+        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
         "spec": {
             "parallelism": 1,
             "template": {
@@ -27,7 +27,7 @@ pub fn create_combiner_template(pipeline_job: &PipelineJob) -> Result<Job, Manag
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &hash},
-                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_hash},
+                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_run_hash},
 
                             {"name": "DAEMON_URL", "value": env::var("DAEMON_URL").unwrap()},
                             {"name": "DAEMON_DATASET", "value": &pipeline_job.input_dataset},

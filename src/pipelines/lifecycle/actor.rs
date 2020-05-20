@@ -41,14 +41,14 @@ impl Actor for PipelineActor {
         info!("Pipeline actor is stopped");
 
         Arbiter::spawn(send_lineage_data(
-            self.pipeline_job.pipeline_hash.to_string(),
+            self.pipeline_job.pipeline_run_hash.to_string(),
             self.lineage_map.clone(),
         ));
     }
 }
 
 async fn send_lineage_data(
-    _pipeline_hash: String,
+    _pipeline_run_hash: String,
     provenance_data: HashMap<String, FragmentLineage>,
 ) {
     info!("Sending provenance info to the daemon");
@@ -83,7 +83,7 @@ impl Handler<KubeJobStatusMessage> for PipelineActor {
 async fn get_jobs_status(pipeline_job: PipelineJob, actor_addr: Addr<PipelineActor>) {
     info!(
         "Checking status for pipeline with hash {}",
-        pipeline_job.pipeline_hash
+        pipeline_job.pipeline_run_hash
     );
 
     let mut statuses: HashMap<String, JobStatus> = HashMap::new();
@@ -92,7 +92,10 @@ async fn get_jobs_status(pipeline_job: PipelineJob, actor_addr: Addr<PipelineAct
     let jobs_client: Api<Job> = Api::namespaced(client.clone(), "default");
     // let pods_client: Api<Pod> = Api::namespaced(client.clone(), "default");
 
-    let lp = ListParams::default().labels(&format!("pipeline_hash={}", pipeline_job.pipeline_hash));
+    let lp = ListParams::default().labels(&format!(
+        "pipeline_run_hash={}",
+        pipeline_job.pipeline_run_hash
+    ));
     let jobs = jobs_client.list(&lp).await.unwrap();
     for job in jobs {
         let metadata = &job.metadata.as_ref().unwrap();
@@ -152,5 +155,21 @@ impl Handler<FragmentLineageMessage> for PipelineActor {
         self.lineage_map
             .insert(msg.fragment_id, msg.fragment_lineage)
             .is_none()
+    }
+}
+
+pub struct StopMessage {}
+
+impl Message for StopMessage {
+    type Result = bool;
+}
+
+impl Handler<StopMessage> for PipelineActor {
+    type Result = bool;
+
+    fn handle(&mut self, _msg: StopMessage, ctx: &mut Context<Self>) -> Self::Result {
+        info!("Receiving stop message.");
+        ctx.stop();
+        true
     }
 }

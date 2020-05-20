@@ -1329,6 +1329,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "iterum-rust"
+version = "0.1.0"
+source = "git+https://github.com/iterum-provenance/iterum-rust#46ef3f5e94896682915b968cd6ba057259320604"
+dependencies = [
+ "rand",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1540,6 +1548,8 @@ dependencies = [
  "dotenv",
  "env_logger",
  "futures",
+ "hyper",
+ "iterum-rust",
  "json",
  "k8s-openapi",
  "kube",

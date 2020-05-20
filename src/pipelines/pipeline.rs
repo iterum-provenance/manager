@@ -22,7 +22,8 @@ pub struct TransformationStep {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PipelineJob {
-    pub pipeline_hash: String,
+    #[serde(default = "empty_hash")]
+    pub pipeline_run_hash: String,
     pub name: String,
     pub input_dataset: String,
     pub input_dataset_commit_hash: String,
@@ -30,6 +31,10 @@ pub struct PipelineJob {
     pub fragmenter_output_channel: String,
     pub steps: Vec<TransformationStep>,
     pub combiner_input_channel: String,
+}
+
+fn empty_hash() -> String {
+    String::from("")
 }
 
 impl PipelineJob {

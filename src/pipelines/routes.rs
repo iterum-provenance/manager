@@ -6,8 +6,9 @@ use crate::pipelines::pipeline::PipelineJob;
 use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{delete, get, post, web, HttpResponse};
 use amiquip::{Connection, QueueDeclareOptions};
+use iterum_rust::utils;
 use k8s_openapi::api::batch::v1::Job;
-use kube::{api::Api, api::ListParams, Client};
+use kube::{api::Api, api::ListParams};
 use serde_json::json;
 use std::collections::HashMap;
 use std::env;
@@ -20,7 +21,7 @@ use actix::prelude::*;
 async fn get_pod_names() -> Result<Vec<String>, ManagerError> {
     use k8s_openapi::api::core::v1::Pod;
 
-    let client = Client::try_default().await.expect("create client");
+    let client = kube::Client::try_default().await.expect("create client");
     let pods: Api<Pod> = Api::namespaced(client, "default");
 
     let lp = ListParams::default(); //.labels("app=blog");
@@ -37,7 +38,7 @@ async fn get_pod_names() -> Result<Vec<String>, ManagerError> {
 }
 
 async fn get_job_names() -> Result<Vec<String>, ManagerError> {
-    let client = Client::try_default().await.expect("create client");
+    let client = kube::Client::try_default().await.expect("create client");
     let jobs: Api<Job> = Api::namespaced(client, "default");
 
     let lp = ListParams::default(); //.labels("app=blog");
@@ -72,7 +73,10 @@ async fn submit_pipeline_actor(
 ) -> Result<HttpResponse, ManagerError> {
     info!("Submitting a pipeline");
 
-    let pipeline = pipeline.into_inner();
+    let mut pipeline = pipeline.into_inner();
+    info!("Pipeline: {:?}", pipeline);
+
+    pipeline.pipeline_run_hash = utils::create_random_hash().to_lowercase();
 
     // Check whether pipeline is valid
     let mut outputs = HashMap::new();
@@ -80,19 +84,19 @@ async fn submit_pipeline_actor(
     for step in &pipeline.steps {
         outputs.insert(
             step.output_channel.to_string(),
-            format!("{}-{}", pipeline.pipeline_hash, step.name.to_string()),
+            format!("{}-{}", pipeline.pipeline_run_hash, step.name.to_string()),
         );
     }
     outputs.insert(
         pipeline.fragmenter_output_channel.to_string(),
-        format!("{}-fragmenter", pipeline.pipeline_hash),
+        format!("{}-fragmenter", pipeline.pipeline_run_hash),
     );
     let mut invalid = false;
     for step in &pipeline.steps {
         match outputs.get(&step.input_channel) {
             Some(parent) => {
                 first_node_upstream_map.insert(
-                    format!("{}-{}", pipeline.pipeline_hash, step.name.to_string()),
+                    format!("{}-{}", pipeline.pipeline_run_hash, step.name.to_string()),
                     parent.to_string(),
                 );
             }
@@ -104,7 +108,7 @@ async fn submit_pipeline_actor(
     match outputs.get(&pipeline.combiner_input_channel) {
         Some(parent) => {
             first_node_upstream_map.insert(
-                format!("{}-combiner", pipeline.pipeline_hash),
+                format!("{}-combiner", pipeline.pipeline_run_hash),
                 parent.to_string(),
             );
         }
@@ -122,7 +126,7 @@ async fn submit_pipeline_actor(
         };
         let address = actor.start();
         let result = config.manager.send(NewPipelineMessage {
-            pipeline_hash: pipeline.pipeline_hash.to_string(),
+            pipeline_run_hash: pipeline.pipeline_run_hash.to_string(),
             address,
         });
         result.await.unwrap();
@@ -162,20 +166,20 @@ async fn get_pipeline_status() -> Result<HttpResponse, ManagerError> {
     Ok(HttpResponse::Ok().json(message_counts))
 }
 
-#[get("/pipeline/{pipeline_hash}/{step_name}/upstream_finished")]
-async fn is_step_done(
+#[get("/pipeline/{pipeline_run_hash}/{step_name}/upstream_finished")]
+async fn is_upstream_finished(
     config: web::Data<config::Config>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ManagerError> {
-    let (pipeline_hash, step_name) = path.into_inner();
+    let (pipeline_run_hash, step_name) = path.into_inner();
     info!(
         "Getting status of step named {} from pipeline with hash {}",
-        step_name, pipeline_hash
+        step_name, pipeline_run_hash
     );
 
     let address = match config
         .manager
-        .send(RequestAddress { pipeline_hash })
+        .send(RequestAddress { pipeline_run_hash })
         .await
         .unwrap()
     {
@@ -219,6 +223,26 @@ async fn delete_pipelines() -> Result<HttpResponse, ManagerError> {
     Ok(HttpResponse::Ok().finish())
 }
 
+use hyper::Client;
+#[get("/list_queues")]
+async fn list_queues() -> Result<HttpResponse, ManagerError> {
+    info!("Returning list of queues");
+    let client = Client::new();
+    let uri = env::var("MQ_BROKER_URL_MANAGEMENT")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let resp = client.get(uri).await.unwrap();
+
+    let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+    let string = std::str::from_utf8(&bytes);
+    // let body = serde_json::from_slice(&bytes).unwrap();
+    // let val = serde_json::to_value(string);
+    // let body = String::from(string);
+    info!("Response: {:?}", string);
+    Ok(HttpResponse::Ok().finish())
+}
+
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_pods);
     cfg.service(get_jobs);
@@ -227,7 +251,8 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(submit_pipeline_actor);
     cfg.service(delete_pipelines);
     cfg.service(get_pipeline_status);
-    cfg.service(is_step_done);
+    cfg.service(is_upstream_finished);
+    cfg.service(list_queues);
 
     provenance::routes::init_routes(cfg);
 }

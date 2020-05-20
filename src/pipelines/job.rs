@@ -9,15 +9,21 @@ pub fn create_job_template(
     pipeline_job: &PipelineJob,
     step: &TransformationStep,
 ) -> Result<Job, ManagerError> {
-    let name = format!("{}-{}", pipeline_job.pipeline_hash, step.name);
+    let name = format!("{}-{}", pipeline_job.pipeline_run_hash, step.name);
     let outputbucket = format!("{}-output", &name);
-    let input_channel = format!("{}-{}", &pipeline_job.pipeline_hash, &step.input_channel);
-    let output_channel = format!("{}-{}", &pipeline_job.pipeline_hash, &step.output_channel);
+    let input_channel = format!(
+        "{}-{}",
+        &pipeline_job.pipeline_run_hash, &step.input_channel
+    );
+    let output_channel = format!(
+        "{}-{}",
+        &pipeline_job.pipeline_run_hash, &step.output_channel
+    );
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": name, "labels": {"pipeline_hash": pipeline_job.pipeline_hash} },
+        "metadata": { "name": name, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
         "spec": {
             "parallelism": 1,
             "template": {
@@ -34,7 +40,7 @@ pub fn create_job_template(
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &name},
-                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_hash},
+                            {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_run_hash},
 
                             {"name": "MINIO_URL", "value": env::var("MINIO_URL").unwrap()},
                             {"name": "MINIO_ACCESS_KEY", "value": env::var("MINIO_ACCESS_KEY").unwrap()},

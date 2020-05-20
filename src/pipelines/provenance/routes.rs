@@ -5,28 +5,31 @@ use crate::pipelines::lifecycle::actor::FragmentLineageMessage;
 use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{post, web, HttpResponse};
 
-#[post("/pipeline/{pipeline_hash}/lineage/{fragment_id}")]
+#[post("/pipeline/{pipeline_run_hash}/lineage/{fragment_id}")]
 async fn submit_fragment_lineage(
     config: web::Data<config::Config>,
     fragment_lineage: web::Json<FragmentLineage>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ManagerError> {
-    let (pipeline_hash, fragment_id) = path.into_inner();
-    info!(
-        "Submitting lineage of fragment: {}:{}",
-        pipeline_hash, fragment_id
-    );
+    let (pipeline_run_hash, fragment_id) = path.into_inner();
+    // debug!(
+    //     "Submitting lineage of fragment: {}:{}",
+    //     pipeline_run_hash, fragment_id
+    // );
 
     let fragment_lineage = fragment_lineage.into_inner();
 
     let address = match config
         .manager
-        .send(RequestAddress { pipeline_hash })
+        .send(RequestAddress { pipeline_run_hash })
         .await
         .unwrap()
     {
         Some(address) => address,
-        None => return Ok(HttpResponse::NotFound().finish()),
+        None => {
+            info!("The manager does not have this actor address..");
+            return Ok(HttpResponse::NotFound().finish());
+        }
     };
 
     let success = address
@@ -37,30 +40,21 @@ async fn submit_fragment_lineage(
         .await;
 
     match success {
-        Ok(success) => Ok(HttpResponse::Ok().json(success)),
-        Err(_) => Ok(HttpResponse::Conflict().finish()),
+        Ok(success) => {
+            if success {
+                info!("Successfully send lineage data ");
+            } else {
+                warn!("The fragment ID was already present.");
+            }
+            Ok(HttpResponse::Ok().json(success))
+        }
+        Err(_) => {
+            error!("Could not send lineage data to actor. Maybe the actor is not active?");
+            Ok(HttpResponse::Conflict().finish())
+        }
     }
-}
-
-#[post("/dummy/pipeline/{pipeline_hash}/lineage/{fragment_id}")]
-async fn submit_fragment_lineage_dummy(
-    _config: web::Data<config::Config>,
-    fragment_lineage: web::Json<FragmentLineage>,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, ManagerError> {
-    let (pipeline_hash, fragment_id) = path.into_inner();
-    info!(
-        "Submitting lineage of fragment: {}:{}",
-        pipeline_hash, fragment_id
-    );
-
-    let fragment_lineage = fragment_lineage.into_inner();
-
-    info!("{:?}", fragment_lineage);
-    Ok(HttpResponse::Ok().json(true))
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(submit_fragment_lineage);
-    cfg.service(submit_fragment_lineage_dummy);
 }
