@@ -57,7 +57,6 @@ GET {{address}}/pipeline/{{pipeline_run_hash}}/{{pipeline_run_hash}}-new-step1/u
 ### Get pods
 GET {{address}}/get_pods HTTP/1.1
 
-
 ### Get jobs
 GET {{address}}/get_jobs HTTP/1.1
 
@@ -70,3 +69,6 @@ DELETE {{address}}/delete_pipelines HTTP/1.1
 
 ### List queues
 GET {{address}}/list_queues HTTP/1.1
+
+### Delete queues
+GET {{address}}/delete_queues HTTP/1.1

@@ -5,7 +5,7 @@ use crate::pipelines::lifecycle::actor::JobStatusMessage;
 use crate::pipelines::pipeline::PipelineJob;
 use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{delete, get, post, web, HttpResponse};
-use amiquip::{Connection, QueueDeclareOptions};
+use amiquip::{Connection, QueueDeclareOptions, QueueDeleteOptions};
 use iterum_rust::utils;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, api::ListParams};
@@ -53,17 +53,6 @@ async fn get_job_names() -> Result<Vec<String>, ManagerError> {
         names.push(name)
     }
     Ok(names)
-}
-
-#[post("/submit_pipeline")]
-async fn submit_pipeline(pipeline: web::Json<PipelineJob>) -> Result<HttpResponse, ManagerError> {
-    info!("Submitting a pipeline");
-
-    let pipeline = pipeline.into_inner();
-
-    pipeline.submit().await?;
-
-    Ok(HttpResponse::Ok().json(pipeline))
 }
 
 #[post("/submit_pipeline_actor")]
@@ -117,7 +106,6 @@ async fn submit_pipeline_actor(
         }
     };
     if !invalid {
-        pipeline.submit().await?;
         let actor = PipelineActor {
             pipeline_job: pipeline.clone(),
             statuses: HashMap::new(),
@@ -187,14 +175,10 @@ async fn is_upstream_finished(
         None => return Ok(HttpResponse::NotFound().finish()),
     };
 
-    info!("Address retrieved.. {:?}", 1);
     let status = address.send(JobStatusMessage { step_name }).await;
     info!("Status: {:?}", status);
     match status {
-        Ok(status) => {
-            let status = status.unwrap_or(false);
-            Ok(HttpResponse::Ok().json(json!({ "finished": status })))
-        }
+        Ok(status) => Ok(HttpResponse::Ok().json(json!({ "finished": status }))),
         Err(_) => Ok(HttpResponse::Conflict().finish()),
     }
 }
@@ -223,23 +207,73 @@ async fn delete_pipelines() -> Result<HttpResponse, ManagerError> {
     Ok(HttpResponse::Ok().finish())
 }
 
+use base64::encode;
+use hyper::header::AUTHORIZATION;
 use hyper::Client;
+use hyper::{Body, Method, Request};
+use serde_json::value::Value;
+
+async fn get_queues() -> HashMap<String, u64> {
+    let client = Client::new();
+    let uri = format!("{}/queues", env::var("MQ_BROKER_URL_MANAGEMENT").unwrap());
+
+    let username = env::var("MQ_BROKER_USERNAME").unwrap();
+    let password = env::var("MQ_BROKER_PASSWORD").unwrap();
+
+    let credentials_encoded = encode(format!("{}:{}", username, password));
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(uri)
+        .header(AUTHORIZATION, format!("Basic {}", credentials_encoded))
+        .body(Body::from(""))
+        .unwrap();
+
+    let resp = client.request(req).await.unwrap();
+
+    let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+    let string = std::str::from_utf8(&bytes).unwrap();
+    let parsed: Value = serde_json::from_str(string).unwrap();
+    let mut map = HashMap::new();
+
+    let arr = parsed.as_array().unwrap();
+
+    for item in arr {
+        let name = item.get("name").unwrap().to_string();
+        let name = name[1..name.len() - 1].to_string();
+
+        map.insert(name, item.get("messages").unwrap().as_u64().unwrap());
+    }
+    map
+}
+
 #[get("/list_queues")]
 async fn list_queues() -> Result<HttpResponse, ManagerError> {
     info!("Returning list of queues");
-    let client = Client::new();
-    let uri = env::var("MQ_BROKER_URL_MANAGEMENT")
-        .unwrap()
-        .parse()
-        .unwrap();
-    let resp = client.get(uri).await.unwrap();
 
-    let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
-    let string = std::str::from_utf8(&bytes);
-    // let body = serde_json::from_slice(&bytes).unwrap();
-    // let val = serde_json::to_value(string);
-    // let body = String::from(string);
-    info!("Response: {:?}", string);
+    let queue_info = get_queues().await;
+    Ok(HttpResponse::Ok().json(queue_info))
+}
+
+#[get("/delete_queues")]
+async fn delete_all_queues() -> Result<HttpResponse, ManagerError> {
+    info!("Deleting all queues");
+
+    let queue_info = get_queues().await;
+
+    let mut connection = Connection::insecure_open(&env::var("MQ_BROKER_URL").unwrap()).unwrap();
+    let channel = connection.open_channel(None).unwrap();
+
+    for queue_name in queue_info.keys() {
+        let queue = channel
+            .queue_declare(queue_name, QueueDeclareOptions::default())
+            .unwrap();
+
+        let delete_options = QueueDeleteOptions::default();
+        queue.delete(delete_options).unwrap();
+
+        info!("Queue {} has been deleted.", queue_name);
+    }
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -247,12 +281,12 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_pods);
     cfg.service(get_jobs);
     cfg.service(get_pipelines);
-    cfg.service(submit_pipeline);
     cfg.service(submit_pipeline_actor);
     cfg.service(delete_pipelines);
     cfg.service(get_pipeline_status);
     cfg.service(is_upstream_finished);
     cfg.service(list_queues);
+    cfg.service(delete_all_queues);
 
     provenance::routes::init_routes(cfg);
 }

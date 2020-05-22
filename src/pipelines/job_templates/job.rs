@@ -1,26 +1,30 @@
-use crate::error::ManagerError;
 use crate::pipelines::pipeline::PipelineJob;
+use crate::pipelines::pipeline::TransformationStep;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
-pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, ManagerError> {
-    let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
-    let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_run_hash);
-    let output_queue = format!(
+pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
+    let name = format!("{}-{}", pipeline_job.pipeline_run_hash, step.name);
+    let outputbucket = format!("{}-output", &name);
+    let input_channel = format!(
         "{}-{}",
-        &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter_output_channel
+        &pipeline_job.pipeline_run_hash, &step.input_channel
+    );
+    let output_channel = format!(
+        "{}-{}",
+        &pipeline_job.pipeline_run_hash, &step.output_channel
     );
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
+        "metadata": { "name": name, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
         "spec": {
             "parallelism": 1,
             "template": {
                 "metadata": {
-                    "name": hash
+                    "name": name
                 },
                 "spec": {
                     "volumes": [
@@ -28,17 +32,11 @@ pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, Man
                     ],
                     "containers": [{
                         "name": "sidecar",
-                        "image": env::var("FRAGMENTER_SIDECAR_IMAGE").unwrap(),
+                        "image": env::var("SIDECAR_IMAGE").unwrap(),
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
-                            {"name": "ITERUM_NAME", "value": &hash},
+                            {"name": "ITERUM_NAME", "value": &name},
                             {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_run_hash},
-
-                            {"name": "DAEMON_URL", "value": env::var("DAEMON_URL").unwrap()},
-                            {"name": "DAEMON_DATASET", "value": &pipeline_job.input_dataset},
-                            {"name": "DAEMON_COMMIT_HASH", "value": &pipeline_job.input_dataset_commit_hash},
-
-                            {"name": "MANAGER_URL", "value": env::var("MANAGER_URL").unwrap()},
 
                             {"name": "MINIO_URL", "value": env::var("MINIO_URL").unwrap()},
                             {"name": "MINIO_ACCESS_KEY", "value": env::var("MINIO_ACCESS_KEY").unwrap()},
@@ -46,12 +44,14 @@ pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, Man
                             {"name": "MINIO_USE_SSL", "value": env::var("MINIO_USE_SSL").unwrap()},
                             {"name": "MINIO_OUTPUT_BUCKET", "value": &outputbucket},
 
-                            {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
-                            {"name": "MQ_OUTPUT_QUEUE", "value": &output_queue},
-                            {"name": "MQ_INPUT_QUEUE", "value": "INVALID"},
+                            {"name": "MANAGER_URL", "value": env::var("MANAGER_URL").unwrap()},
 
-                            {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
-                            {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
+                            {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
+                            {"name": "MQ_OUTPUT_QUEUE", "value": &output_channel},
+                            {"name": "MQ_INPUT_QUEUE", "value": &input_channel},
+
+                            {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
+                            {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",
@@ -59,12 +59,12 @@ pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, Man
                         }]
                     },
                     {
-                        "name": "fragmenter",
-                        "image": &pipeline_job.fragmenter_image,
+                        "name": "transformation-step",
+                        "image": step.image,
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
-                            {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
-                            {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
+                            {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
+                            {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",
@@ -75,6 +75,6 @@ pub fn create_fragmenter_template(pipeline_job: &PipelineJob) -> Result<Job, Man
                 }
             }
         }
-    }))?;
-    Ok(job)
+    })).unwrap();
+    job
 }

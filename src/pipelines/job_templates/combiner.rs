@@ -1,10 +1,9 @@
-use crate::error::ManagerError;
 use crate::pipelines::pipeline::PipelineJob;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
-pub fn create_combiner_template(pipeline_job: &PipelineJob) -> Result<Job, ManagerError> {
+pub fn combiner(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
     let input_queue = format!(
         "{}-{}",
@@ -56,6 +55,6 @@ pub fn create_combiner_template(pipeline_job: &PipelineJob) -> Result<Job, Manag
                 }
             }
         }
-    }))?;
-    Ok(job)
+    })).unwrap();
+    job
 }
