@@ -32,6 +32,7 @@ content-type: application/json
   "input_dataset_commit_hash": "eDputXUoj4K1xPViRVAUduEHtJKRMyPY",
   "fragmenter_image": "iterum/fragmenter:latest",
   "fragmenter_output_channel": "step1_input",
+  "fragmenter_config_files": ["file1", ".*\\.conf", "etc"],
   "steps": [
       {"name": "new-step1", "image": "iterum/transformation-step:latest", "input_channel": "step1_input", "output_channel": "step1_output"},
       {"name": "new-step2", "image": "iterum/transformation-step:latest", "input_channel": "step1_output", "output_channel": "step2_output"}

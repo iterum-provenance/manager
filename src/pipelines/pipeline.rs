@@ -26,6 +26,7 @@ pub struct PipelineJob {
     pub input_dataset_commit_hash: String,
     pub fragmenter_image: String,
     pub fragmenter_output_channel: String,
+    pub fragmenter_config_files: Vec<String>,
     pub steps: Vec<TransformationStep>,
     pub combiner_input_channel: String,
 }

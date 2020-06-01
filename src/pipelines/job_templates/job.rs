@@ -71,7 +71,7 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
                             "mountPath": "/data-volume"
                         }]
                     }],
-                    "restartPolicy": "OnFailure"
+                    "restartPolicy": "Never"
                 }
             }
         }

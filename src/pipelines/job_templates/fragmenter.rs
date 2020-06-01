@@ -10,6 +10,7 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
         "{}-{}",
         &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter_output_channel
     );
+    let interum_config = serde_json::to_string(&pipeline_job.fragmenter_config_files).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -32,25 +33,26 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &hash},
                             {"name": "PIPELINE_HASH", "value": &pipeline_job.pipeline_run_hash},
-
+                            
                             {"name": "DAEMON_URL", "value": env::var("DAEMON_URL").unwrap()},
                             {"name": "DAEMON_DATASET", "value": &pipeline_job.input_dataset},
                             {"name": "DAEMON_COMMIT_HASH", "value": &pipeline_job.input_dataset_commit_hash},
-
+                            
                             {"name": "MANAGER_URL", "value": env::var("MANAGER_URL").unwrap()},
-
+                            
                             {"name": "MINIO_URL", "value": env::var("MINIO_URL").unwrap()},
                             {"name": "MINIO_ACCESS_KEY", "value": env::var("MINIO_ACCESS_KEY").unwrap()},
                             {"name": "MINIO_SECRET_KEY", "value": env::var("MINIO_SECRET_KEY").unwrap()},
                             {"name": "MINIO_USE_SSL", "value": env::var("MINIO_USE_SSL").unwrap()},
                             {"name": "MINIO_OUTPUT_BUCKET", "value": &outputbucket},
-
+                            
                             {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
                             {"name": "MQ_OUTPUT_QUEUE", "value": &output_queue},
                             {"name": "MQ_INPUT_QUEUE", "value": "INVALID"},
-
+                            
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
                             {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
+                            {"name": "ITERUM_CONFIG", "value": &interum_config},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",
@@ -70,7 +72,7 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                             "mountPath": "/data-volume"
                         }]
                     }],
-                    "restartPolicy": "OnFailure"
+                    "restartPolicy": "Never"
                 }
             }
         }

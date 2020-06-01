@@ -51,7 +51,7 @@ pub fn combiner(pipeline_job: &PipelineJob) -> Job {
 
                         ]
                     }],
-                    "restartPolicy": "OnFailure"
+                    "restartPolicy": "Never"
                 }
             }
         }
