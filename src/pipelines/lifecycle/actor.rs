@@ -104,9 +104,10 @@ async fn get_jobs_status(pipeline_job: PipelineJob, actor_addr: Addr<PipelineAct
         let name = metadata.name.clone().unwrap();
         let status = job.status.clone().unwrap();
         let success = match status.succeeded {
-            Some(val) => val == 1,
+            Some(val) => val >= 1, // Should actually depend on the pipeline definition
             None => false,
         };
+        info!("Status of {} is {:?}", name, status);
         statuses.insert(name, success);
     }
     actor_addr

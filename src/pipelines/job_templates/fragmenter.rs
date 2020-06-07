@@ -2,6 +2,7 @@ use crate::pipelines::pipeline::PipelineJob;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
+use std::collections::HashMap;
 
 pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
@@ -10,7 +11,11 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
         "{}-{}",
         &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter_output_channel
     );
-    let interum_config = serde_json::to_string(&pipeline_job.fragmenter_config_files).unwrap();
+
+    let mut iterum_config = HashMap::new();
+    iterum_config.insert("config_files", &pipeline_job.fragmenter_config_files);
+
+    let interum_config = serde_json::to_string(&iterum_config).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",

@@ -21,7 +21,7 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
         "kind": "Job",
         "metadata": { "name": name, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
         "spec": {
-            "parallelism": 1,
+            "parallelism": step.instance_count,
             "template": {
                 "metadata": {
                     "name": name

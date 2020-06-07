@@ -12,6 +12,7 @@ use kube::{
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TransformationStep {
     pub name: String,
+    pub instance_count: usize,
     pub image: String,
     pub input_channel: String,
     pub output_channel: String,
