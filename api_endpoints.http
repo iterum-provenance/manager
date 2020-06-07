@@ -1,4 +1,4 @@
-@address = http://localhost:3001
+@address = http://localhost:3002
 @dataset_path = pipeline1
 
 ### Create new pipeline
@@ -46,20 +46,57 @@ POST {{address}}/submit_pipeline_actor HTTP/1.1
 content-type: application/json
 
 {
-  "name": "ego-photos-1",
-  "input_dataset": "ego-photos-subset-100",
-  "input_dataset_commit_hash": "8DNaDJhz5BP3WizeROTMeY4g5E8w8m3y",
-  "fragmenter_image": "localhost:32000/ego-photos-fragmenter:latest",
-  "fragmenter_output_channel": "fragmenter_output",
-  "fragmenter_config_files": ["config.json"],
-  "steps": [
-      {"name": "labeler", "image": "localhost:32000/ego-photos-labeler:latest", "instance_count": 1, "input_channel": "fragmenter_output", "output_channel": "labeler_output"},
-      {"name": "timeslot-aggregation", "image": "localhost:32000/ego-photos-timeslot-aggregation:latest", "instance_count": 1, "input_channel": "labeler_output", "output_channel": "aggregate_timeslot_output"},
-      {"name": "topics", "image": "localhost:32000/ego-photos-topics:latest", "instance_count": 1, "input_channel": "aggregate_timeslot_output", "output_channel": "topics_output"},
-      {"name": "routine-discovery", "image": "localhost:32000/ego-photos-routine-discovery:latest", "instance_count": 1, "input_channel": "topics_output", "output_channel": "routine_discovery_output"},
-      {"name": "evaluation", "image": "localhost:32000/ego-photos-evaluation:latest", "instance_count": 1, "input_channel": "routine_discovery_output", "output_channel": "evaluation_output"}
-  ],
-  "combiner_input_channel": "evaluation_output"
+    "name": "ego-photos-1",
+    "input_dataset": "ego-photos-subset-100",
+    "input_dataset_commit_hash": "8DNaDJhz5BP3WizeROTMeY4g5E8w8m3y",
+    "fragmenter": {
+        "image": "localhost:32000/ego-photos-fragmenter:latest",
+        "output_channel": "fragmenter_output",
+        "config": {
+            "config_files": [
+                "config.json"
+            ]
+        }
+    },
+    "steps": [
+        {
+            "name": "labeler",
+            "image": "localhost:32000/ego-photos-labeler:latest",
+            "instance_count": 1,
+            "input_channel": "fragmenter_output",
+            "output_channel": "labeler_output",
+            "config": {
+              "alpha": 0.1
+            }
+        },
+        {
+            "name": "timeslot-aggregation",
+            "image": "localhost:32000/ego-photos-timeslot-aggregation:latest",
+            "input_channel": "labeler_output",
+            "output_channel": "aggregate_timeslot_output"
+        },
+        {
+            "name": "topics",
+            "image": "localhost:32000/ego-photos-topics:latest",
+            "input_channel": "aggregate_timeslot_output",
+            "output_channel": "topics_output"
+        },
+        {
+            "name": "routine-discovery",
+            "image": "localhost:32000/ego-photos-routine-discovery:latest",
+            "input_channel": "topics_output",
+            "output_channel": "routine_discovery_output"
+        },
+        {
+            "name": "evaluation",
+            "image": "localhost:32000/ego-photos-evaluation:latest",
+            "input_channel": "routine_discovery_output",
+            "output_channel": "evaluation_output"
+        }
+    ],
+    "combiner": {
+        "input_channel": "evaluation_output"
+    }
 }
 ### Delete pipeline
 DELETE {{address}}/delete_pipelines HTTP/1.1

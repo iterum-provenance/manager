@@ -2,20 +2,40 @@ use crate::pipelines::pipeline::PipelineJob;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
-use std::collections::HashMap;
 
 pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
     let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_run_hash);
     let output_queue = format!(
         "{}-{}",
-        &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter_output_channel
+        &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter.output_channel
     );
 
-    let mut iterum_config = HashMap::new();
-    iterum_config.insert("config_files", &pipeline_job.fragmenter_config_files);
+    let mut fragmenter_config = pipeline_job.fragmenter.config.clone();
 
-    let interum_config = serde_json::to_string(&iterum_config).unwrap();
+    let mut config_files_all: Vec<String> = Vec::new();
+    
+    if pipeline_job.fragmenter.config.config.contains_key("config_files") {
+        let files = pipeline_job.fragmenter.config.config.get("config_files").unwrap().as_array().unwrap();
+        let file_strings = files.iter().map(|x| x.to_string().replace("\"", "")).collect();
+        config_files_all = [config_files_all, file_strings].concat();
+    }
+    for step in &pipeline_job.steps {
+        if step.config.config.contains_key("config_files") {
+            let files = step.config.config.get("config_files").unwrap().as_array().unwrap();
+            let file_strings = files.iter().map(|x| 
+                x.to_string().replace("\"", "")
+            ).collect();
+            config_files_all = [config_files_all, file_strings].concat();
+        }
+    }
+    fragmenter_config.config_files_all = config_files_all;
+
+    let mut global_config = pipeline_job.config.clone();
+    global_config.config.extend(fragmenter_config.config);
+    fragmenter_config.config = global_config.config;
+
+    let interum_config = serde_json::to_string(&fragmenter_config).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -58,6 +78,7 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
                             {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
                             {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",
@@ -66,11 +87,13 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                     },
                     {
                         "name": "fragmenter",
-                        "image": &pipeline_job.fragmenter_image,
+                        "image": &pipeline_job.fragmenter.image,
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
                             {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
+                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",

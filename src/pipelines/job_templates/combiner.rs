@@ -7,7 +7,7 @@ pub fn combiner(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
     let input_queue = format!(
         "{}-{}",
-        &pipeline_job.pipeline_run_hash, &pipeline_job.combiner_input_channel
+        &pipeline_job.pipeline_run_hash, &pipeline_job.combiner.input_channel
     );
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",

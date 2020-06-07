@@ -16,6 +16,12 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
         &pipeline_job.pipeline_run_hash, &step.output_channel
     );
 
+    let local_config = step.config.clone();
+    let mut global_config = pipeline_job.config.clone();
+    global_config.config.extend(local_config.config);
+
+    let interum_config = serde_json::to_string(&global_config).unwrap();
+
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
@@ -52,6 +58,8 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
 
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
+                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",
@@ -65,6 +73,8 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
+                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{
                             "name": "data-volume",

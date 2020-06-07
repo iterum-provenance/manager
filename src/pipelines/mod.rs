@@ -4,4 +4,5 @@ pub mod pipeline_manager;
 pub mod provenance;
 pub mod routes;
 pub use routes::init_routes;
+pub mod defaults;
 pub mod job_templates;

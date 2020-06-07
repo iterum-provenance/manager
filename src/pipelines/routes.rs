@@ -77,7 +77,7 @@ async fn submit_pipeline_actor(
         );
     }
     outputs.insert(
-        pipeline.fragmenter_output_channel.to_string(),
+        pipeline.fragmenter.output_channel.to_string(),
         format!("{}-fragmenter", pipeline.pipeline_run_hash),
     );
     let mut invalid = false;
@@ -94,7 +94,7 @@ async fn submit_pipeline_actor(
             }
         };
     }
-    match outputs.get(&pipeline.combiner_input_channel) {
+    match outputs.get(&pipeline.combiner.input_channel) {
         Some(parent) => {
             first_node_upstream_map.insert(
                 format!("{}-combiner", pipeline.pipeline_run_hash),

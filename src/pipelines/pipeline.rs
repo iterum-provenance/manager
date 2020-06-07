@@ -1,7 +1,10 @@
 use crate::error::ManagerError;
+use crate::pipelines::defaults::{empty_array, empty_config, empty_hash, one_instance};
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 
 use kube::{
     api::Api,
@@ -12,10 +15,45 @@ use kube::{
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TransformationStep {
     pub name: String,
+    #[serde(default = "one_instance")]
     pub instance_count: usize,
     pub image: String,
     pub input_channel: String,
     pub output_channel: String,
+    #[serde(default = "empty_config", skip_serializing_if = "Config::is_empty")]
+    pub config: Config,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Fragmenter {
+    pub image: String,
+    pub output_channel: String,
+    pub config: FragmenterConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Combiner {
+    pub input_channel: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Config {
+    #[serde(flatten)]
+    pub config: HashMap<String, Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FragmenterConfig {
+    #[serde(default = "empty_array")]
+    pub config_files_all: Vec<String>,
+    #[serde(flatten)]
+    pub config: HashMap<String, Value>,
+}
+
+impl Config {
+    pub fn is_empty(&self) -> bool {
+        self.config.is_empty()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,15 +63,11 @@ pub struct PipelineJob {
     pub name: String,
     pub input_dataset: String,
     pub input_dataset_commit_hash: String,
-    pub fragmenter_image: String,
-    pub fragmenter_output_channel: String,
-    pub fragmenter_config_files: Vec<String>,
+    pub fragmenter: Fragmenter,
     pub steps: Vec<TransformationStep>,
-    pub combiner_input_channel: String,
-}
-
-fn empty_hash() -> String {
-    String::from("")
+    pub combiner: Combiner,
+    #[serde(default = "empty_config", skip_serializing_if = "Config::is_empty")]
+    pub config: Config,
 }
 
 use super::job_templates;
