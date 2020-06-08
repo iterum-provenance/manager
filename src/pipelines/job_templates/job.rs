@@ -19,8 +19,10 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
     let local_config = step.config.clone();
     let mut global_config = pipeline_job.config.clone();
     global_config.config.extend(local_config.config);
+    global_config.config_files.extend(local_config.config_files);
 
     let interum_config = serde_json::to_string(&global_config).unwrap();
+    let mq_prefetch_count_string = serde_json::to_string(&step.prefetch_count).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -55,6 +57,7 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
                             {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
                             {"name": "MQ_OUTPUT_QUEUE", "value": &output_channel},
                             {"name": "MQ_INPUT_QUEUE", "value": &input_channel},
+                            {"name": "MQ_PREFETCH_COUNT", "value": &mq_prefetch_count_string},
 
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},

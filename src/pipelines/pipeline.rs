@@ -1,5 +1,7 @@
 use crate::error::ManagerError;
-use crate::pipelines::defaults::{empty_array, empty_config, empty_hash, one_instance};
+use crate::pipelines::defaults::{
+    empty_config, empty_hash, none_config_files_all, none_usize, one_instance,
+};
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
@@ -17,10 +19,12 @@ pub struct TransformationStep {
     pub name: String,
     #[serde(default = "one_instance")]
     pub instance_count: usize,
+    #[serde(default = "none_usize")]
+    pub prefetch_count: Option<usize>,
     pub image: String,
     pub input_channel: String,
     pub output_channel: String,
-    #[serde(default = "empty_config", skip_serializing_if = "Config::is_empty")]
+    #[serde(default = "empty_config")]
     pub config: Config,
 }
 
@@ -28,7 +32,13 @@ pub struct TransformationStep {
 pub struct Fragmenter {
     pub image: String,
     pub output_channel: String,
-    pub config: FragmenterConfig,
+    #[serde(default = "empty_config")]
+    pub config: Config,
+    #[serde(
+        default = "none_config_files_all",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub config_files_all: Option<HashMap<String, Vec<String>>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,21 +48,23 @@ pub struct Combiner {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
-    #[serde(flatten)]
+    #[serde(default = "HashMap::new", skip_serializing_if = "HashMap::is_empty")]
+    pub config_files: HashMap<String, String>,
+    #[serde(default = "HashMap::new", flatten)]
     pub config: HashMap<String, Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FragmenterConfig {
-    #[serde(default = "empty_array")]
-    pub config_files_all: Vec<String>,
-    #[serde(flatten)]
-    pub config: HashMap<String, Value>,
-}
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct FragmenterConfig {
+//     #[serde(default = "HashMap::new")]
+//     pub config_files_all: HashMap<String, Vec<String>>,
+//     #[serde(flatten)]
+//     pub config: HashMap<String, Value>,
+// }
 
 impl Config {
     pub fn is_empty(&self) -> bool {
-        self.config.is_empty()
+        self.config.is_empty() && self.config_files.is_empty()
     }
 }
 

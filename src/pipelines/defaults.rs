@@ -11,10 +11,15 @@ pub fn empty_hash() -> String {
 
 pub fn empty_config() -> Config {
     Config {
+        config_files: HashMap::new(),
         config: HashMap::new(),
     }
 }
 
-pub fn empty_array() -> Vec<String> {
-    Vec::new()
+pub fn none_usize() -> Option<usize> {
+    None
+}
+
+pub fn none_config_files_all() -> Option<HashMap<String, Vec<String>>> {
+    None
 }

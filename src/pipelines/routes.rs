@@ -111,6 +111,7 @@ async fn submit_pipeline_actor(
             statuses: HashMap::new(),
             first_node_upstream_map,
             lineage_map: HashMap::new(),
+            instance_counts: HashMap::new(),
         };
         let address = actor.start();
         let result = config.manager.send(NewPipelineMessage {

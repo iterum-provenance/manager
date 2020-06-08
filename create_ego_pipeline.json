@@ -1,7 +1,7 @@
 {
     "name": "ego-photos-1",
-    "input_dataset": "ego-photos-subset-100",
-    "input_dataset_commit_hash": "8DNaDJhz5BP3WizeROTMeY4g5E8w8m3y",
+    "input_dataset": "ego-photos-subset-2000",
+    "input_dataset_commit_hash": "fTK1op9w2MqD3zr1bs3UzJ35ekbsIqMR",
     "fragmenter": {
         "image": "localhost:32000/ego-photos-fragmenter:latest",
         "output_channel": "fragmenter_output",
@@ -15,7 +15,7 @@
         {
             "name": "labeler",
             "image": "localhost:32000/ego-photos-labeler:latest",
-            "instance_count": 1,
+            "instance_count": 12,
             "input_channel": "fragmenter_output",
             "output_channel": "labeler_output",
             "config": {

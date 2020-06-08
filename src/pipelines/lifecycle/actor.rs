@@ -22,6 +22,7 @@ pub struct PipelineActor {
     pub statuses: HashMap<String, bool>,
     pub first_node_upstream_map: HashMap<String, String>,
     pub lineage_map: HashMap<String, FragmentLineage>,
+    pub instance_counts: HashMap<String, usize>,
 }
 
 impl PipelineActor {}
@@ -32,8 +33,21 @@ impl Actor for PipelineActor {
     fn started(&mut self, ctx: &mut Context<Self>) {
         info!("Pipeline actor is alive");
 
+        let combiner = format!("{}-combiner", self.pipeline_job.pipeline_run_hash);
+        let fragmenter = format!("{}-fragmenter", self.pipeline_job.pipeline_run_hash);
+
+        self.instance_counts.insert(combiner, 1);
+        self.instance_counts.insert(fragmenter, 1);
+        for step in &self.pipeline_job.steps {
+            let step_name = format!("{}-{}", self.pipeline_job.pipeline_run_hash, step.name);
+            self.instance_counts.insert(step_name, step.instance_count);
+        }
         ctx.run_interval(Duration::from_millis(5000), |act, context| {
-            Arbiter::spawn(get_jobs_status(act.pipeline_job.clone(), context.address()));
+            Arbiter::spawn(get_jobs_status(
+                act.pipeline_job.clone(),
+                context.address(),
+                act.instance_counts.clone(),
+            ));
         });
 
         Arbiter::spawn(PipelineJob::submit(self.pipeline_job.clone()));
@@ -82,7 +96,11 @@ impl Handler<KubeJobStatusMessage> for PipelineActor {
     }
 }
 
-async fn get_jobs_status(pipeline_job: PipelineJob, actor_addr: Addr<PipelineActor>) {
+async fn get_jobs_status(
+    pipeline_job: PipelineJob,
+    actor_addr: Addr<PipelineActor>,
+    instance_counts: HashMap<String, usize>,
+) {
     info!(
         "Checking status for pipeline with hash {}",
         pipeline_job.pipeline_run_hash
@@ -103,11 +121,17 @@ async fn get_jobs_status(pipeline_job: PipelineJob, actor_addr: Addr<PipelineAct
         let metadata = &job.metadata.as_ref().unwrap();
         let name = metadata.name.clone().unwrap();
         let status = job.status.clone().unwrap();
+
+        let instance_count = instance_counts.get(&name).unwrap();
+
         let success = match status.succeeded {
-            Some(val) => val >= 1, // Should actually depend on the pipeline definition
+            Some(val) => val as usize == *instance_count, // Should actually depend on the pipeline definition
             None => false,
         };
-        info!("Status of {} is {:?}", name, status);
+        info!(
+            "Status of {} is {:?}. Instances required: {}",
+            name, status, instance_count
+        );
         statuses.insert(name, success);
     }
     actor_addr

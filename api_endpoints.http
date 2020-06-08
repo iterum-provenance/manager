@@ -53,9 +53,9 @@ content-type: application/json
         "image": "localhost:32000/ego-photos-fragmenter:latest",
         "output_channel": "fragmenter_output",
         "config": {
-            "config_files": [
-                "config.json"
-            ]
+            "config_files": {
+                "CONFIG": "config.json"
+            }
         }
     },
     "steps": [

@@ -1,7 +1,9 @@
 use crate::pipelines::pipeline::PipelineJob;
 use k8s_openapi::api::batch::v1::Job;
-use serde_json::json;
+use std::collections::HashMap;
+use serde_json::{json, Value};
 use std::env;
+use std::collections::hash_map::Entry;
 
 pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
@@ -11,31 +13,44 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
         &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter.output_channel
     );
 
-    let mut fragmenter_config = pipeline_job.fragmenter.config.clone();
 
-    let mut config_files_all: Vec<String> = Vec::new();
-    
-    if pipeline_job.fragmenter.config.config.contains_key("config_files") {
-        let files = pipeline_job.fragmenter.config.config.get("config_files").unwrap().as_array().unwrap();
-        let file_strings = files.iter().map(|x| x.to_string().replace("\"", "")).collect();
-        config_files_all = [config_files_all, file_strings].concat();
-    }
-    for step in &pipeline_job.steps {
-        if step.config.config.contains_key("config_files") {
-            let files = step.config.config.get("config_files").unwrap().as_array().unwrap();
-            let file_strings = files.iter().map(|x| 
-                x.to_string().replace("\"", "")
-            ).collect();
-            config_files_all = [config_files_all, file_strings].concat();
+    let mut config_files_all: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (key, value) in &pipeline_job.fragmenter.config.config_files {
+        match config_files_all.entry(key.clone()) {
+            Entry::Occupied(mut list) => {
+                let entry = list.get_mut();
+                entry.push(value.clone());
+            }
+            Entry::Vacant(v) => {
+                v.insert(vec![value.clone()]);
+            }
         }
     }
-    fragmenter_config.config_files_all = config_files_all;
-
+    for step in &pipeline_job.steps {
+        for (key, value) in &step.config.config_files {
+            match config_files_all.entry(key.clone()) {
+                Entry::Occupied(mut list) => {
+                    let entry = list.get_mut();
+                    entry.push(value.clone());
+                }
+                Entry::Vacant(v) => {
+                    v.insert(vec![value.clone()]);
+                }
+            }
+        }
+    }
+    let local_config = pipeline_job.fragmenter.config.clone();
     let mut global_config = pipeline_job.config.clone();
-    global_config.config.extend(fragmenter_config.config);
-    fragmenter_config.config = global_config.config;
+    global_config.config.extend(local_config.config);
+    global_config.config_files.extend(local_config.config_files);
 
-    let interum_config = serde_json::to_string(&fragmenter_config).unwrap();
+    // fragmenter_config.config_files_all = config_files_all;
+    let mut env_config: HashMap<String, Value> = HashMap::new();
+    env_config.insert("config".to_owned(), serde_json::to_value(&global_config).unwrap());
+    env_config.insert("config_files_all".to_owned(), serde_json::to_value(config_files_all).unwrap());
+
+    let interum_config = serde_json::to_string(&env_config).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
