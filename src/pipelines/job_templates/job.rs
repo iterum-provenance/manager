@@ -22,7 +22,10 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
     global_config.config_files.extend(local_config.config_files);
 
     let interum_config = serde_json::to_string(&global_config).unwrap();
-    let mq_prefetch_count_string = serde_json::to_string(&step.prefetch_count).unwrap();
+    let mq_prefetch_count_string = match step.prefetch_count {
+        Some(count) => count.to_string(),
+        None => String::from(""),
+    };
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",

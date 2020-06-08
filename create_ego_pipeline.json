@@ -6,16 +6,16 @@
         "image": "localhost:32000/ego-photos-fragmenter:latest",
         "output_channel": "fragmenter_output",
         "config": {
-            "config_files": [
-                "config.json"
-            ]
+            "config_files": {
+                "CONFIG": "config.json"
+            }
         }
     },
     "steps": [
         {
             "name": "labeler",
             "image": "localhost:32000/ego-photos-labeler:latest",
-            "instance_count": 12,
+            "instance_count": 1,
             "input_channel": "fragmenter_output",
             "output_channel": "labeler_output",
             "config": {
