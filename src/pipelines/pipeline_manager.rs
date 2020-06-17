@@ -72,10 +72,10 @@ impl Handler<RequestAddress> for PipelineManager {
     type Result = Option<Addr<PipelineActor>>;
 
     fn handle(&mut self, msg: RequestAddress, _ctx: &mut Context<Self>) -> Self::Result {
-        info!(
-            "Manager returns address of actor of pipeline with hash {}",
-            msg.pipeline_run_hash
-        );
+        // info!(
+        //     "Manager returns address of actor of pipeline with hash {}",
+        //     msg.pipeline_run_hash
+        // );
 
         match self.addresses.get(&msg.pipeline_run_hash) {
             Some(address) => Some(address.clone()),

@@ -2,6 +2,7 @@ use crate::error::ManagerError;
 use crate::pipelines::defaults::{
     empty_config, empty_hash, none_config_files_all, none_usize, one_instance,
 };
+use crate::pipelines::lifecycle::models::JobStatus;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
@@ -134,5 +135,43 @@ impl PipelineJob {
             // names.push(name)
         }
         Ok(())
+    }
+
+    pub fn create_job_statuses(
+        self,
+        node_upstream_map: HashMap<String, String>,
+    ) -> HashMap<String, JobStatus> {
+        let combiner_name = format!("{}-combiner", self.pipeline_run_hash);
+        let fragmenter_name = format!("{}-fragmenter", self.pipeline_run_hash);
+
+        let mut statuses: HashMap<String, JobStatus> = HashMap::new();
+
+        let status_combiner = JobStatus {
+            node_upstream: Some(node_upstream_map.get(&combiner_name).unwrap().to_string()),
+            instances_in_job: 1,
+            instances_done: 0,
+            mq_input_channel_count: None,
+        };
+        statuses.insert(combiner_name, status_combiner);
+        let status_fragmenter = JobStatus {
+            node_upstream: None,
+            instances_in_job: 1,
+            instances_done: 0,
+            mq_input_channel_count: None,
+        };
+        statuses.insert(fragmenter_name, status_fragmenter);
+
+        for step in &self.steps {
+            let step_name = format!("{}-{}", self.pipeline_run_hash, step.name);
+            let status = JobStatus {
+                node_upstream: Some(node_upstream_map.get(&step_name).unwrap().to_string()),
+                instances_in_job: step.instance_count,
+                instances_done: 0,
+                mq_input_channel_count: None,
+            };
+            statuses.insert(step_name, status);
+        }
+
+        statuses
     }
 }

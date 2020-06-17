@@ -1,28 +1,27 @@
 use crate::pipelines::pipeline::PipelineJob;
 use actix::prelude::*;
 // use actix::Addr;
+use super::messages::KubeJobStatusMessage;
+use crate::pipelines::message_queue::actor::MessageQueueActor;
+use crate::pipelines::message_queue::messages::GetAllQueueCountsMessage;
 use crate::pipelines::provenance::models::FragmentLineage;
 
+use crate::pipelines::lifecycle::models::JobStatus;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, api::ListParams, Client};
 use std::collections::HashMap;
 use std::time::Duration;
 
-pub struct KubeJobStatusMessage {
-    pub status: bool,
-    pub kube_statuses: HashMap<String, bool>,
-}
-
-impl Message for KubeJobStatusMessage {
-    type Result = bool;
-}
-
 pub struct PipelineActor {
+    pub mq_actor: Addr<MessageQueueActor>,
     pub pipeline_job: PipelineJob,
-    pub statuses: HashMap<String, bool>,
-    pub first_node_upstream_map: HashMap<String, String>,
+    // pub statuses: HashMap<String, bool>,
+    // pub first_node_upstream_map: HashMap<String, String>,
+    // pub instances_per_job: HashMap<String, usize>,
+    // pub instances_done_counts: HashMap<String, usize>,
     pub lineage_map: HashMap<String, FragmentLineage>,
-    pub instance_counts: HashMap<String, usize>,
+    pub mq_channel_counts: HashMap<String, usize>,
+    pub job_statuses: HashMap<String, JobStatus>,
 }
 
 impl PipelineActor {}
@@ -33,20 +32,22 @@ impl Actor for PipelineActor {
     fn started(&mut self, ctx: &mut Context<Self>) {
         info!("Pipeline actor is alive");
 
-        let combiner = format!("{}-combiner", self.pipeline_job.pipeline_run_hash);
-        let fragmenter = format!("{}-fragmenter", self.pipeline_job.pipeline_run_hash);
+        // let combiner = format!("{}-combiner", self.pipeline_job.pipeline_run_hash);
+        // let fragmenter = format!("{}-fragmenter", self.pipeline_job.pipeline_run_hash);
 
-        self.instance_counts.insert(combiner, 1);
-        self.instance_counts.insert(fragmenter, 1);
-        for step in &self.pipeline_job.steps {
-            let step_name = format!("{}-{}", self.pipeline_job.pipeline_run_hash, step.name);
-            self.instance_counts.insert(step_name, step.instance_count);
-        }
-        ctx.run_interval(Duration::from_millis(5000), |act, context| {
+        // self.instances_per_job.insert(combiner, 1);
+        // self.instances_per_job.insert(fragmenter, 1);
+        // for step in &self.pipeline_job.steps {
+        //     let step_name = format!("{}-{}", self.pipeline_job.pipeline_run_hash, step.name);
+        //     self.instances_per_job
+        //         .insert(step_name, step.instance_count);
+        // }
+        ctx.run_interval(Duration::from_millis(10000), |act, context| {
             Arbiter::spawn(get_jobs_status(
+                act.mq_actor.clone(),
                 act.pipeline_job.clone(),
                 context.address(),
-                act.instance_counts.clone(),
+                // act.instances_per_job.clone(),
             ));
         });
 
@@ -68,125 +69,64 @@ async fn send_lineage_data(
     provenance_data: HashMap<String, FragmentLineage>,
 ) {
     debug!("Sending provenance info to the daemon");
-    debug!("Sending this: {:?}", provenance_data);
+    // debug!("Sending this: {:?}", provenance_data);
     warn!("NOT ACTUALLY SENDING INFO YET, UNIMPLEMENTED.");
 }
 
-impl Handler<KubeJobStatusMessage> for PipelineActor {
-    type Result = bool;
-
-    fn handle(&mut self, msg: KubeJobStatusMessage, ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Current pipeline status:");
-        for (job_name, status) in self.statuses.iter() {
-            debug!("Job name:{}\tStatus: {}", job_name, status);
-        }
-
-        self.statuses = msg.kube_statuses;
-        let success: Vec<bool> = self
-            .statuses
-            .iter()
-            .map(|(_, &val)| val)
-            .filter(|val| !val)
-            .collect();
-        if success.is_empty() {
-            ctx.stop();
-        }
-
-        msg.status
-    }
-}
-
 async fn get_jobs_status(
+    mq_actor: Addr<MessageQueueActor>,
     pipeline_job: PipelineJob,
     actor_addr: Addr<PipelineActor>,
-    instance_counts: HashMap<String, usize>,
+    // instance_counts: HashMap<String, usize>,
 ) {
-    info!(
-        "Checking status for pipeline with hash {}",
-        pipeline_job.pipeline_run_hash
-    );
-
-    let mut statuses: HashMap<String, bool> = HashMap::new();
+    let mut instances_done_counts: HashMap<String, usize> = HashMap::new();
+    let mut mq_input_channel_counts: HashMap<String, Option<usize>> = HashMap::new();
 
     let client = Client::try_default().await.expect("create client");
     let jobs_client: Api<Job> = Api::namespaced(client.clone(), "default");
-    // let pods_client: Api<Pod> = Api::namespaced(client.clone(), "default");
 
     let lp = ListParams::default().labels(&format!(
         "pipeline_run_hash={}",
         pipeline_job.pipeline_run_hash
     ));
-    let jobs = jobs_client.list(&lp).await.unwrap();
+    let jobs = jobs_client
+        .list(&lp)
+        .await
+        .expect("Manager was not able to reach Kubernetes API..");
+    let message_queue_counts = mq_actor
+        .send(GetAllQueueCountsMessage {})
+        .await
+        .unwrap()
+        .unwrap();
+
+    // info!("Message queue counts: {:?}", message_queue_counts);
     for job in jobs {
         let metadata = &job.metadata.as_ref().unwrap();
         let name = metadata.name.clone().unwrap();
+        let labels = metadata.labels.clone().unwrap();
+        let input_channel = labels.get("input_channel").unwrap();
+
         let status = job.status.clone().unwrap();
-
-        let instance_count = instance_counts.get(&name).unwrap();
-
-        let success = match status.succeeded {
-            Some(val) => val as usize == *instance_count, // Should actually depend on the pipeline definition
-            None => false,
+        // let instance_count = instance_counts.get(&name).unwrap();
+        let queue_count = match message_queue_counts.get(input_channel) {
+            Some(count) => Some(*count as usize),
+            None => None,
         };
-        info!(
-            "Status of {} is {:?}. Instances required: {}",
-            name, status, instance_count
-        );
-        statuses.insert(name, success);
+        let instances_done = match status.succeeded {
+            Some(val) => val as usize,
+            None => 0,
+        };
+        mq_input_channel_counts.insert(name.clone(), queue_count);
+        instances_done_counts.insert(name.clone(), instances_done);
     }
     actor_addr
         .send(KubeJobStatusMessage {
             status: true,
-            kube_statuses: statuses,
+            instances_done_counts,
+            mq_input_channel_counts,
         })
         .await
         .unwrap();
-}
-
-pub struct JobStatusMessage {
-    pub step_name: String,
-}
-
-impl Message for JobStatusMessage {
-    type Result = bool;
-}
-
-impl Handler<JobStatusMessage> for PipelineActor {
-    type Result = bool;
-
-    fn handle(&mut self, msg: JobStatusMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Retrieving {} from upstream list", msg.step_name);
-        info!("Upstream list: {:?}", self.first_node_upstream_map);
-
-        match self.first_node_upstream_map.get(&msg.step_name) {
-            Some(step_upstream) => match self.statuses.get(step_upstream) {
-                Some(&status) => status,
-                None => false,
-            },
-            None => false,
-        }
-    }
-}
-
-pub struct FragmentLineageMessage {
-    pub fragment_id: String,
-    pub fragment_lineage: FragmentLineage,
-}
-
-impl Message for FragmentLineageMessage {
-    type Result = bool;
-}
-
-impl Handler<FragmentLineageMessage> for PipelineActor {
-    type Result = bool;
-
-    fn handle(&mut self, msg: FragmentLineageMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Received lineage for fragment: {}", msg.fragment_id);
-
-        self.lineage_map
-            .insert(msg.fragment_id, msg.fragment_lineage)
-            .is_none()
-    }
 }
 
 pub struct StopMessage {}

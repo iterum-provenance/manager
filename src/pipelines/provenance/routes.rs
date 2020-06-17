@@ -1,7 +1,7 @@
 use super::models::FragmentLineage;
 use crate::config;
 use crate::error::ManagerError;
-use crate::pipelines::lifecycle::actor::FragmentLineageMessage;
+use crate::pipelines::lifecycle::messages::FragmentLineageMessage;
 use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{post, web, HttpResponse};
 
@@ -42,7 +42,7 @@ async fn submit_fragment_lineage(
     match success {
         Ok(success) => {
             if success {
-                info!("Successfully send lineage data ");
+                // info!("Successfully send lineage data ");
             } else {
                 warn!("The fragment ID was already present.");
             }

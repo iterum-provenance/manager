@@ -1,7 +1,7 @@
 use super::provenance;
 use crate::config;
 use crate::error::ManagerError;
-use crate::pipelines::lifecycle::actor::JobStatusMessage;
+use crate::pipelines::lifecycle::messages::JobStatusMessage;
 use crate::pipelines::pipeline::PipelineJob;
 use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{delete, get, post, web, HttpResponse};
@@ -27,11 +27,11 @@ async fn get_pod_names() -> Result<Vec<String>, ManagerError> {
     let lp = ListParams::default(); //.labels("app=blog");
     let pods = pods.list(&lp).await.unwrap();
 
-    info!("There are pods.");
+    // info!("There are pods.");
     let mut names: Vec<String> = vec![];
     for pod in pods {
         let name = pod.metadata.unwrap().name.unwrap().clone();
-        info!("Pod: {:?}", name);
+        // info!("Pod: {:?}", name);
         names.push(name)
     }
     Ok(names)
@@ -44,12 +44,12 @@ async fn get_job_names() -> Result<Vec<String>, ManagerError> {
     let lp = ListParams::default(); //.labels("app=blog");
     let jobs = jobs.list(&lp).await.unwrap();
 
-    info!("There are pods.");
+    // info!("There are pods.");
     let mut names: Vec<String> = vec![];
     for job in jobs {
         // job.
         let name = job.metadata.unwrap().name.unwrap();
-        info!("Pod: {:?}", name);
+        // info!("Pod: {:?}", name);
         names.push(name)
     }
     Ok(names)
@@ -106,14 +106,19 @@ async fn submit_pipeline_actor(
         }
     };
     if !invalid {
+        let job_statuses = pipeline
+            .clone()
+            .create_job_statuses(first_node_upstream_map);
         let actor = PipelineActor {
+            mq_actor: config.mq_actor.clone(),
             pipeline_job: pipeline.clone(),
-            statuses: HashMap::new(),
-            first_node_upstream_map,
             lineage_map: HashMap::new(),
-            instance_counts: HashMap::new(),
+            mq_channel_counts: HashMap::new(),
+            job_statuses,
         };
         let address = actor.start();
+        // let mut write_lock = config.addresses.write().unwrap();
+        // // write_lock.insert(pipeline.pipeline_run_hash.to_string(), address);
         let result = config.manager.send(NewPipelineMessage {
             pipeline_run_hash: pipeline.pipeline_run_hash.to_string(),
             address,
@@ -161,10 +166,10 @@ async fn is_upstream_finished(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ManagerError> {
     let (pipeline_run_hash, step_name) = path.into_inner();
-    info!(
-        "Getting status of step named {} from pipeline with hash {}",
-        step_name, pipeline_run_hash
-    );
+    // info!(
+    //     "Getting status of step named {} from pipeline with hash {}",
+    //     step_name, pipeline_run_hash
+    // );
 
     let address = match config
         .manager
@@ -177,7 +182,7 @@ async fn is_upstream_finished(
     };
 
     let status = address.send(JobStatusMessage { step_name }).await;
-    info!("Status: {:?}", status);
+    // info!("Status: {:?}", status);
     match status {
         Ok(status) => Ok(HttpResponse::Ok().json(json!({ "finished": status }))),
         Err(_) => Ok(HttpResponse::Conflict().finish()),
@@ -208,60 +213,29 @@ async fn delete_pipelines() -> Result<HttpResponse, ManagerError> {
     Ok(HttpResponse::Ok().finish())
 }
 
-use base64::encode;
-use hyper::header::AUTHORIZATION;
-use hyper::Client;
-use hyper::{Body, Method, Request};
-use serde_json::value::Value;
+#[get("/list_queues")]
+async fn list_queues() -> Result<HttpResponse, ManagerError> {
+    // info!("Returning list of queues");
 
-async fn get_queues() -> HashMap<String, u64> {
-    let client = Client::new();
     let uri = format!("{}/queues", env::var("MQ_BROKER_URL_MANAGEMENT").unwrap());
 
     let username = env::var("MQ_BROKER_USERNAME").unwrap();
     let password = env::var("MQ_BROKER_PASSWORD").unwrap();
 
-    let credentials_encoded = encode(format!("{}:{}", username, password));
-
-    let req = Request::builder()
-        .method(Method::GET)
-        .uri(uri)
-        .header(AUTHORIZATION, format!("Basic {}", credentials_encoded))
-        .body(Body::from(""))
-        .unwrap();
-
-    let resp = client.request(req).await.unwrap();
-
-    let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
-    let string = std::str::from_utf8(&bytes).unwrap();
-    let parsed: Value = serde_json::from_str(string).unwrap();
-    let mut map = HashMap::new();
-
-    let arr = parsed.as_array().unwrap();
-
-    for item in arr {
-        let name = item.get("name").unwrap().to_string();
-        let name = name[1..name.len() - 1].to_string();
-
-        map.insert(name, item.get("messages").unwrap().as_u64().unwrap());
-    }
-    map
-}
-
-#[get("/list_queues")]
-async fn list_queues() -> Result<HttpResponse, ManagerError> {
-    info!("Returning list of queues");
-
-    let queue_info = get_queues().await;
+    let queue_info =
+        crate::pipelines::message_queue::utils::get_queues(uri, username, password).await;
     Ok(HttpResponse::Ok().json(queue_info))
 }
 
 #[get("/delete_queues")]
 async fn delete_all_queues() -> Result<HttpResponse, ManagerError> {
     info!("Deleting all queues");
+    let uri = format!("{}/queues", env::var("MQ_BROKER_URL_MANAGEMENT").unwrap());
 
-    let queue_info = get_queues().await;
-
+    let username = env::var("MQ_BROKER_USERNAME").unwrap();
+    let password = env::var("MQ_BROKER_PASSWORD").unwrap();
+    let queue_info =
+        crate::pipelines::message_queue::utils::get_queues(uri, username, password).await;
     let mut connection = Connection::insecure_open(&env::var("MQ_BROKER_URL").unwrap()).unwrap();
     let channel = connection.open_channel(None).unwrap();
 

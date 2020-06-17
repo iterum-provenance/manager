@@ -1,4 +1,5 @@
 pub mod lifecycle;
+pub mod message_queue;
 pub mod pipeline;
 pub mod pipeline_manager;
 pub mod provenance;

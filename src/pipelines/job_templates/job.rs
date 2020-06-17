@@ -30,12 +30,17 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": name, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
+        "metadata": { "name": name, "labels": {
+            "pipeline_run_hash": pipeline_job.pipeline_run_hash,                     
+            "input_channel": input_channel,
+            "output_channel": output_channel
+        } },
         "spec": {
             "parallelism": step.instance_count,
             "template": {
                 "metadata": {
-                    "name": name
+                    "name": name,
+
                 },
                 "spec": {
                     "volumes": [

@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
     let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_run_hash);
-    let output_queue = format!(
+    let output_channel = format!(
         "{}-{}",
         &pipeline_job.pipeline_run_hash, &pipeline_job.fragmenter.output_channel
     );
@@ -51,11 +51,12 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
     env_config.insert("config_files_all".to_owned(), serde_json::to_value(config_files_all).unwrap());
 
     let interum_config = serde_json::to_string(&env_config).unwrap();
+    let local_config2 = serde_json::to_string(&global_config).unwrap();
 
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
+        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash, "input_channel": "", "output_channel": output_channel} },
         "spec": {
             "parallelism": 1,
             "template": {
@@ -87,7 +88,7 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                             {"name": "MINIO_OUTPUT_BUCKET", "value": &outputbucket},
                             
                             {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
-                            {"name": "MQ_OUTPUT_QUEUE", "value": &output_queue},
+                            {"name": "MQ_OUTPUT_QUEUE", "value": &output_channel},
                             {"name": "MQ_INPUT_QUEUE", "value": "INVALID"},
                             
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
@@ -107,7 +108,7 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
                             {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
-                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG", "value": &local_config2},
                             {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{

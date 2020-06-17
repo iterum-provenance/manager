@@ -5,19 +5,20 @@ use std::env;
 
 pub fn combiner(pipeline_job: &PipelineJob) -> Job {
     let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
-    let input_queue = format!(
+    let input_channel = format!(
         "{}-{}",
         &pipeline_job.pipeline_run_hash, &pipeline_job.combiner.input_channel
     );
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash} },
+        "metadata": { "name": hash, "labels": {"pipeline_run_hash": pipeline_job.pipeline_run_hash, "input_channel": input_channel, "output_channel": ""} },
         "spec": {
             "parallelism": 1,
             "template": {
                 "metadata": {
                     "name": hash
+                    
                 },
                 "spec": {
                     "containers": [{
@@ -44,7 +45,7 @@ pub fn combiner(pipeline_job: &PipelineJob) -> Job {
 
                             {"name": "MQ_BROKER_URL", "value": env::var("MQ_BROKER_URL").unwrap()},
                             {"name": "MQ_OUTPUT_QUEUE", "value": "INVALID"},
-                            {"name": "MQ_INPUT_QUEUE", "value": &input_queue},
+                            {"name": "MQ_INPUT_QUEUE", "value": &input_channel},
 
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
