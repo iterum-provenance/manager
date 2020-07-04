@@ -70,6 +70,12 @@ pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
                     "containers": [{
                         "name": "sidecar",
                         "image": env::var("FRAGMENTER_SIDECAR_IMAGE").unwrap(),
+                        "resources" : {
+                            "limits": {
+                                "cpu": "1000m",
+                                "memory": "1024Mi",
+                            }
+                        },
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &hash},

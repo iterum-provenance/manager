@@ -7,6 +7,7 @@ use crate::pipelines::message_queue::messages::GetAllQueueCountsMessage;
 use crate::pipelines::provenance::models::FragmentLineage;
 
 use crate::pipelines::lifecycle::models::JobStatus;
+use crate::pipelines::provenance::actor::LineageActor;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, api::ListParams, Client};
 use std::collections::HashMap;
@@ -19,9 +20,10 @@ pub struct PipelineActor {
     // pub first_node_upstream_map: HashMap<String, String>,
     // pub instances_per_job: HashMap<String, usize>,
     // pub instances_done_counts: HashMap<String, usize>,
-    pub lineage_map: HashMap<String, FragmentLineage>,
+    // pub lineage_map: HashMap<String, FragmentLineage>,
     pub mq_channel_counts: HashMap<String, usize>,
     pub job_statuses: HashMap<String, JobStatus>,
+    pub lineage_actor: Addr<LineageActor>,
 }
 
 impl PipelineActor {}
@@ -32,51 +34,30 @@ impl Actor for PipelineActor {
     fn started(&mut self, ctx: &mut Context<Self>) {
         info!("Pipeline actor is alive");
 
-        // let combiner = format!("{}-combiner", self.pipeline_job.pipeline_run_hash);
-        // let fragmenter = format!("{}-fragmenter", self.pipeline_job.pipeline_run_hash);
-
-        // self.instances_per_job.insert(combiner, 1);
-        // self.instances_per_job.insert(fragmenter, 1);
-        // for step in &self.pipeline_job.steps {
-        //     let step_name = format!("{}-{}", self.pipeline_job.pipeline_run_hash, step.name);
-        //     self.instances_per_job
-        //         .insert(step_name, step.instance_count);
-        // }
+        info!("Starting periodic check of status");
         ctx.run_interval(Duration::from_millis(10000), |act, context| {
             Arbiter::spawn(get_jobs_status(
                 act.mq_actor.clone(),
                 act.pipeline_job.clone(),
                 context.address(),
+                act.lineage_actor.clone(),
                 // act.instances_per_job.clone(),
             ));
         });
-
+        info!("Spawn submission of pipeline");
         Arbiter::spawn(PipelineJob::submit(self.pipeline_job.clone()));
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         info!("Pipeline actor is stopped");
-
-        Arbiter::spawn(send_lineage_data(
-            self.pipeline_job.pipeline_run_hash.to_string(),
-            self.lineage_map.clone(),
-        ));
     }
-}
-
-async fn send_lineage_data(
-    _pipeline_run_hash: String,
-    provenance_data: HashMap<String, FragmentLineage>,
-) {
-    debug!("Sending provenance info to the daemon");
-    // debug!("Sending this: {:?}", provenance_data);
-    warn!("NOT ACTUALLY SENDING INFO YET, UNIMPLEMENTED.");
 }
 
 async fn get_jobs_status(
     mq_actor: Addr<MessageQueueActor>,
     pipeline_job: PipelineJob,
     actor_addr: Addr<PipelineActor>,
+    lineage_addr: Addr<LineageActor>,
     // instance_counts: HashMap<String, usize>,
 ) {
     let mut instances_done_counts: HashMap<String, usize> = HashMap::new();
@@ -119,7 +100,7 @@ async fn get_jobs_status(
         mq_input_channel_counts.insert(name.clone(), queue_count);
         instances_done_counts.insert(name.clone(), instances_done);
     }
-    actor_addr
+    let success = actor_addr
         .send(KubeJobStatusMessage {
             status: true,
             instances_done_counts,
@@ -127,6 +108,19 @@ async fn get_jobs_status(
         })
         .await
         .unwrap();
+
+    if success {
+        // self.lineage_actor.send()
+        // use crate::pipelines::provenance::actor::StopMessage;
+        // self.lineage_actor.send(StopMessage {}).wait();
+        info!("Pipeline done. Killing actors.");
+        actor_addr.send(StopMessage {}).await.unwrap();
+        lineage_addr
+            .send(crate::pipelines::provenance::actor::StopMessage {})
+            .await
+            .unwrap();
+        // ctx.stop();
+    };
 }
 
 pub struct StopMessage {}

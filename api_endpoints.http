@@ -43,6 +43,9 @@ content-type: application/json
 
 # "input_dataset": "ego-photos-all",
 # "input_dataset_commit_hash": "9eDBTroAspznXv7eSYSy4W6GiaLSz1n6",
+
+# @registry = registry.localhost:5000
+@registry = eu.gcr.io/iterum
 ### Create pipeline ego photos
 POST {{address}}/submit_pipeline_actor HTTP/1.1
 content-type: application/json
@@ -50,9 +53,9 @@ content-type: application/json
 {
     "name": "ego-photos-all-1",
     "input_dataset": "ego-photos-all",
-    "input_dataset_commit_hash": "9eDBTroAspznXv7eSYSy4W6GiaLSz1n6",
+    "input_dataset_commit_hash": "S3FbuOh6XMM8D51JWfSOtgye1fDeDBs1",
     "fragmenter": {
-        "image": "localhost:32000/egocentric-fragmenter:latest",
+        "image": "eu.gcr.io/iterum/egocentric-fragmenter:latest",
         "output_channel": "fragmenter_output",
         "config": {
             "config_files": {
@@ -63,8 +66,8 @@ content-type: application/json
     "steps": [
         {
             "name": "labeler",
-            "image": "localhost:32000/egocentric-labeler:latest",
-            "instance_count": 10,
+            "image": "eu.gcr.io/iterum/egocentric-labeler:latest",
+            "instance_count": 3,
             "prefetch_count": 50,
             "input_channel": "fragmenter_output",
             "output_channel": "labeler_output",
@@ -74,25 +77,28 @@ content-type: application/json
         },
         {
             "name": "timeslot-aggregation",
-            "image": "localhost:32000/egocentric-timeslot-aggregator:latest",
+            "image": "eu.gcr.io/iterum/egocentric-timeslot-aggregator:latest",
             "input_channel": "labeler_output",
             "output_channel": "aggregate_timeslot_output"
         },
         {
             "name": "topics",
-            "image": "localhost:32000/egocentric-topic-discoverer:latest",
+            "image": "eu.gcr.io/iterum/egocentric-topic-discoverer:latest",
             "input_channel": "aggregate_timeslot_output",
-            "output_channel": "topics_output"
+            "output_channel": "topics_output",
+            "config": {
+                "random_seed": 42
+            }
         },
         {
             "name": "routine-discovery",
-            "image": "localhost:32000/egocentric-routine-discoverer:latest",
+            "image": "eu.gcr.io/iterum/egocentric-routine-discoverer:latest",
             "input_channel": "topics_output",
             "output_channel": "routine_discovery_output"
         },
         {
             "name": "evaluation",
-            "image": "localhost:32000/egocentric-evaluator:latest",
+            "image": "eu.gcr.io/iterum/egocentric-evaluator:latest",
             "input_channel": "routine_discovery_output",
             "output_channel": "evaluation_output"
         }

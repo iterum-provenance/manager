@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 pub struct Config {
-    pub manager: Addr<PipelineManager>,
+    // pub manager: Addr<PipelineManager>,
     pub mq_actor: Addr<MessageQueueActor>,
     pub addresses: RwLock<HashMap<String, Addr<PipelineActor>>>,
 }

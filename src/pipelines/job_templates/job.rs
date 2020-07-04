@@ -37,6 +37,7 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
         } },
         "spec": {
             "parallelism": step.instance_count,
+            "completions": step.instance_count,
             "template": {
                 "metadata": {
                     "name": name,
@@ -49,6 +50,12 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
                     "containers": [{
                         "name": "sidecar",
                         "image": env::var("SIDECAR_IMAGE").unwrap(),
+                        "resources" : {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "64Mi",
+                            }
+                        },
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &name},

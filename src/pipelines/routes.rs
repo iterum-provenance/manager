@@ -15,6 +15,7 @@ use std::env;
 
 use crate::pipelines::lifecycle::actor::PipelineActor;
 use crate::pipelines::pipeline_manager::NewPipelineMessage;
+use crate::pipelines::provenance::actor::LineageActor;
 
 use actix::prelude::*;
 
@@ -109,21 +110,32 @@ async fn submit_pipeline_actor(
         let job_statuses = pipeline
             .clone()
             .create_job_statuses(first_node_upstream_map);
+
+        // let lineage_actor = ;
+        let pipeline_hash = pipeline.clone().pipeline_run_hash;
+        let lineage_actor = LineageActor {
+            pipeline_run_hash: pipeline_hash.clone(),
+            listener: None,
+        };
+        // Arbiter::spawn(future: F)()
+        // let lineage_addr = SyncArbiter::start(1, move || );
+
+        let lineage_addr = lineage_actor.start();
         let actor = PipelineActor {
             mq_actor: config.mq_actor.clone(),
             pipeline_job: pipeline.clone(),
-            lineage_map: HashMap::new(),
+            lineage_actor: lineage_addr,
             mq_channel_counts: HashMap::new(),
             job_statuses,
         };
         let address = actor.start();
-        // let mut write_lock = config.addresses.write().unwrap();
-        // // write_lock.insert(pipeline.pipeline_run_hash.to_string(), address);
-        let result = config.manager.send(NewPipelineMessage {
-            pipeline_run_hash: pipeline.pipeline_run_hash.to_string(),
-            address,
-        });
-        result.await.unwrap();
+        let mut write_lock = config.addresses.write().unwrap();
+        write_lock.insert(pipeline.pipeline_run_hash.to_string(), address);
+        // let result = config.manager.send(NewPipelineMessage {
+        //     pipeline_run_hash: pipeline.pipeline_run_hash.to_string(),
+        //     address,
+        // });
+        // result.await.unwrap();
         Ok(HttpResponse::Ok().json(pipeline))
     } else {
         Ok(HttpResponse::Conflict().json(json!({"message":"Pipeline is not valid."})))
@@ -166,23 +178,29 @@ async fn is_upstream_finished(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ManagerError> {
     let (pipeline_run_hash, step_name) = path.into_inner();
-    // info!(
-    //     "Getting status of step named {} from pipeline with hash {}",
-    //     step_name, pipeline_run_hash
-    // );
-
-    let address = match config
-        .manager
-        .send(RequestAddress { pipeline_run_hash })
-        .await
-        .unwrap()
-    {
+    info!(
+        "Getting status of step named {} from pipeline with hash {}",
+        step_name, pipeline_run_hash
+    );
+    let read_lock = config.addresses.read().unwrap();
+    let address = match read_lock.get(&pipeline_run_hash) {
         Some(address) => address,
         None => return Ok(HttpResponse::NotFound().finish()),
     };
+    // if read_lock.contains_key(pipeline_run_hash) {};
+
+    // let address = match config
+    //     .manager
+    //     .send(RequestAddress { pipeline_run_hash })
+    //     .await
+    //     .unwrap()
+    // {
+    //     Some(address) => address,
+    //     None => return Ok(HttpResponse::NotFound().finish()),
+    // };
 
     let status = address.send(JobStatusMessage { step_name }).await;
-    // info!("Status: {:?}", status);
+    info!("Status: {:?}", status);
     match status {
         Ok(status) => Ok(HttpResponse::Ok().json(json!({ "finished": status }))),
         Err(_) => Ok(HttpResponse::Conflict().finish()),
@@ -263,5 +281,5 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(list_queues);
     cfg.service(delete_all_queues);
 
-    provenance::routes::init_routes(cfg);
+    // provenance::routes::init_routes(cfg);
 }

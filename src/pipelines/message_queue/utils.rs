@@ -17,7 +17,10 @@ pub async fn get_queues(url: String, username: String, password: String) -> Hash
         .body(Body::from(""))
         .unwrap();
 
-    let resp = client.request(req).await.unwrap();
+    let resp = client
+        .request(req)
+        .await
+        .expect("Was unable to reach RabbitMQ.");
 
     let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
     let string = std::str::from_utf8(&bytes).unwrap();

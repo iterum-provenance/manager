@@ -79,10 +79,7 @@ impl Handler<KubeJobStatusMessage> for PipelineActor {
             .map(|(_, status)| status.is_done())
             .filter(|val| !val)
             .collect();
-        if success.is_empty() {
-            ctx.stop();
-        }
 
-        msg.status
+        success.is_empty()
     }
 }

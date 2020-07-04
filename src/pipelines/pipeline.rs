@@ -86,6 +86,7 @@ pub struct PipelineJob {
 use super::job_templates;
 impl PipelineJob {
     pub async fn submit(pipeline_job: PipelineJob) {
+        info!("Submitting the pipeline to Kubernetes API.");
         let client = Client::try_default().await.expect("create client");
         let jobs_client: Api<Job> = Api::namespaced(client, "default");
         let pp = PostParams::default();
@@ -107,7 +108,11 @@ impl PipelineJob {
                     assert_eq!(Meta::name(&job), name);
                     info!("Created job {}", name);
                 }
-                Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+                Err(kube::Error::Api(ae)) => {
+                    panic!("Kubernetes error: {}", ae);
+                    // assert_eq!(ae.code, 409)
+                }
+                    , // if you skipped delete, for instance
                 Err(e) => panic!("Error {}", e), // any other case is probably bad
             }
         }

@@ -18,12 +18,17 @@ pub fn combiner(pipeline_job: &PipelineJob) -> Job {
             "template": {
                 "metadata": {
                     "name": hash
-                    
                 },
                 "spec": {
                     "containers": [{
                         "name": "combiner",
                         "image": env::var("COMBINER_IMAGE").unwrap(),
+                        "resources" : {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "64Mi",
+                            }
+                        },
                         "env": [
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "ITERUM_NAME", "value": &hash},

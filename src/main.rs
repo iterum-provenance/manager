@@ -25,10 +25,10 @@ async fn main() -> std::io::Result<()> {
 
     let mut listenfd = ListenFd::from_env();
 
-    let manager = PipelineManager {
-        addresses: HashMap::new(),
-    };
-    let addr = manager.start();
+    // let manager = PipelineManager {
+    //     addresses: HashMap::new(),
+    // };
+    // let addr = manager.start();
 
     let mq_actor = MessageQueueActor {
         queue_counts: HashMap::new(),
@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
     let mq_actor_addr = mq_actor.start();
 
     let config = web::Data::new(config::Config {
-        manager: addr,
+        // manager: addr,
         mq_actor: mq_actor_addr,
         addresses: RwLock::new(HashMap::new()),
     });
