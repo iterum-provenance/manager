@@ -1,10 +1,10 @@
-use crate::pipelines::pipeline::PipelineJob;
-use crate::pipelines::pipeline::TransformationStep;
+use iterum_rust::pipeline::PipelineRun;
+use iterum_rust::pipeline::TransformationStep;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
-pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
+pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
     let name = format!("{}-{}", pipeline_job.pipeline_run_hash, step.name);
     let outputbucket = format!("{}-output", &name);
     let input_channel = format!(
@@ -53,7 +53,6 @@ pub fn job(pipeline_job: &PipelineJob, step: &TransformationStep) -> Job {
                         "resources" : {
                             "limits": {
                                 "cpu": "100m",
-                                "memory": "64Mi",
                             }
                         },
                         "env": [

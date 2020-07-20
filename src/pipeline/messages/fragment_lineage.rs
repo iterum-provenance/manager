@@ -1,4 +1,4 @@
-use crate::pipelines::lifecycle::actor::PipelineActor;
+use crate::pipelines::actor::PipelineActor;
 use crate::pipelines::provenance::models::FragmentLineage;
 use actix::prelude::*;
 

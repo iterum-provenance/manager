@@ -1,9 +1,9 @@
-use crate::pipelines::pipeline::PipelineJob;
+use iterum_rust::pipeline::PipelineRun;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
-pub fn combiner(pipeline_job: &PipelineJob) -> Job {
+pub fn combiner(pipeline_job: &PipelineRun) -> Job {
     let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
     let input_channel = format!(
         "{}-{}",

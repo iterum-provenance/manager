@@ -1,4 +1,4 @@
-use crate::pipelines::lifecycle::actor::PipelineActor;
+use crate::pipeline::actor::PipelineActor;
 use actix::prelude::*;
 
 pub struct JobStatusMessage {

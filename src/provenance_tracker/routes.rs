@@ -1,7 +1,7 @@
 use super::models::FragmentLineage;
 use crate::config;
 use crate::error::ManagerError;
-use crate::pipelines::lifecycle::messages::FragmentLineageMessage;
+use crate::pipelines::messages::FragmentLineageMessage;
 // use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{post, web, HttpResponse};
 

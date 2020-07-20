@@ -5,7 +5,11 @@ use hyper::{Body, Method, Request};
 use serde_json::value::Value;
 use std::collections::HashMap;
 
-pub async fn get_queues(url: String, username: String, password: String) -> HashMap<String, u64> {
+pub async fn get_queues(
+    url: String,
+    username: String,
+    password: String,
+) -> HashMap<String, Option<usize>> {
     let client = Client::new();
 
     let credentials_encoded = encode(format!("{}:{}", username, password));
@@ -25,7 +29,7 @@ pub async fn get_queues(url: String, username: String, password: String) -> Hash
     let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
     let string = std::str::from_utf8(&bytes).unwrap();
     let parsed: Value = serde_json::from_str(string).unwrap();
-    let mut map = HashMap::new();
+    let mut map: HashMap<String, Option<usize>> = HashMap::new();
 
     let arr = parsed.as_array().unwrap();
 
@@ -37,7 +41,7 @@ pub async fn get_queues(url: String, username: String, password: String) -> Hash
             Some(value) => value.as_u64().unwrap(),
             None => 0,
         };
-        map.insert(name, count);
+        map.insert(name, Some(count as usize));
     }
     map
 }

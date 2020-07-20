@@ -1,5 +1,5 @@
-use crate::pipelines::lifecycle::actor::PipelineActor;
-use crate::pipelines::lifecycle::actor::StopMessage;
+use crate::pipelines::actor::PipelineActor;
+use crate::pipelines::actor::StopMessage;
 use actix::prelude::*;
 use actix::Addr;
 use std::collections::hash_map::Entry;

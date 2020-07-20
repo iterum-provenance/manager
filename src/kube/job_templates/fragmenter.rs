@@ -1,11 +1,11 @@
-use crate::pipelines::pipeline::PipelineJob;
+use iterum_rust::pipeline::PipelineRun;
 use k8s_openapi::api::batch::v1::Job;
 use std::collections::HashMap;
 use serde_json::{json, Value};
 use std::env;
 use std::collections::hash_map::Entry;
 
-pub fn fragmenter(pipeline_job: &PipelineJob) -> Job {
+pub fn fragmenter(pipeline_job: &PipelineRun) -> Job {
     let hash = format!("{}-fragmenter", &pipeline_job.pipeline_run_hash);
     let outputbucket = format!("{}-fragmenter-output", &pipeline_job.pipeline_run_hash);
     let output_channel = format!(

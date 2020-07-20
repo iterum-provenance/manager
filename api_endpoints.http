@@ -44,82 +44,82 @@ content-type: application/json
 # "input_dataset": "ego-photos-all",
 # "input_dataset_commit_hash": "9eDBTroAspznXv7eSYSy4W6GiaLSz1n6",
 
-# @registry = registry.localhost:5000
+# @registry = registry.iterum
 @registry = eu.gcr.io/iterum
 ### Create pipeline ego photos
 POST {{address}}/submit_pipeline_actor HTTP/1.1
 content-type: application/json
 
 {
-    "name": "ego-photos-all-1",
-    "input_dataset": "ego-photos-all",
-    "input_dataset_commit_hash": "S3FbuOh6XMM8D51JWfSOtgye1fDeDBs1",
-    "fragmenter": {
-        "image": "eu.gcr.io/iterum/egocentric-fragmenter:latest",
-        "output_channel": "fragmenter_output",
-        "config": {
-            "config_files": {
-                "CONFIG": "config.json"
-            }
-        }
-    },
-    "steps": [
-        {
-            "name": "labeler",
-            "image": "eu.gcr.io/iterum/egocentric-labeler:latest",
-            "instance_count": 3,
-            "prefetch_count": 50,
-            "input_channel": "fragmenter_output",
-            "output_channel": "labeler_output",
-            "config": {
-                "alpha": 0.1
-            }
-        },
-        {
-            "name": "timeslot-aggregation",
-            "image": "eu.gcr.io/iterum/egocentric-timeslot-aggregator:latest",
-            "input_channel": "labeler_output",
-            "output_channel": "aggregate_timeslot_output"
-        },
-        {
-            "name": "topics",
-            "image": "eu.gcr.io/iterum/egocentric-topic-discoverer:latest",
-            "input_channel": "aggregate_timeslot_output",
-            "output_channel": "topics_output",
-            "config": {
-                "random_seed": 42
-            }
-        },
-        {
-            "name": "routine-discovery",
-            "image": "eu.gcr.io/iterum/egocentric-routine-discoverer:latest",
-            "input_channel": "topics_output",
-            "output_channel": "routine_discovery_output"
-        },
-        {
-            "name": "evaluation",
-            "image": "eu.gcr.io/iterum/egocentric-evaluator:latest",
-            "input_channel": "routine_discovery_output",
-            "output_channel": "evaluation_output"
-        }
-    ],
-    "combiner": {
-        "input_channel": "evaluation_output"
-    },
+  "name": "ego-photos-all-small",
+  "input_dataset": "ego-photos-all",
+  "input_dataset_commit_hash": "S3FbuOh6XMM8D51JWfSOtgye1fDeDBs1",
+  "fragmenter": {
+    "image": "iterum/egocentric-fragmenter:latest",
+    "output_channel": "fragmenter_output",
     "config": {
-        "time_slots": [
-            "0-7",
-            "7-9",
-            "9-11",
-            "11-13",
-            "13-15",
-            "15-17",
-            "17-19",
-            "19-21",
-            "21-24"
-        ],
-        "topic_count": 6
+      "config_files": {
+        "CONFIG": "config.json"
+      }
     }
+  },
+  "steps": [
+    {
+      "name": "labeler",
+      "image": "iterum/egocentric-labeler:latest",
+      "instance_count": 3,
+      "prefetch_count": 50,
+      "input_channel": "fragmenter_output",
+      "output_channel": "labeler_output",
+      "config": {
+        "alpha": 0.5
+      }
+    },
+    {
+      "name": "timeslot-aggregation",
+      "image": "iterum/egocentric-timeslot-aggregator:latest",
+      "input_channel": "labeler_output",
+      "output_channel": "aggregate_timeslot_output"
+    },
+    {
+      "name": "topics",
+      "image": "iterum/egocentric-topic-discoverer:latest",
+      "input_channel": "aggregate_timeslot_output",
+      "output_channel": "topics_output",
+      "config": {
+        "random_seed": 42
+      }
+    },
+    {
+      "name": "routine-discovery",
+      "image": "iterum/egocentric-routine-discoverer:latest",
+      "input_channel": "topics_output",
+      "output_channel": "routine_discovery_output"
+    },
+    {
+      "name": "evaluation",
+      "image": "iterum/egocentric-evaluator:latest",
+      "input_channel": "routine_discovery_output",
+      "output_channel": "evaluation_output"
+    }
+  ],
+  "combiner": {
+    "input_channel": "evaluation_output"
+  },
+  "config": {
+    "time_slots": [
+      "0-7",
+      "7-9",
+      "9-11",
+      "11-13",
+      "13-15",
+      "15-17",
+      "17-19",
+      "19-21",
+      "21-24"
+    ],
+    "topic_count": 6
+  }
 }
 ### Delete pipeline
 DELETE {{address}}/delete_pipelines HTTP/1.1

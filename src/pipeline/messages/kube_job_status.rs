@@ -1,4 +1,4 @@
-use crate::pipelines::lifecycle::actor::PipelineActor;
+use crate::pipeline::actor::PipelineActor;
 use actix::prelude::*;
 use std::collections::HashMap;
 
@@ -27,10 +27,12 @@ impl Handler<KubeJobStatusMessage> for PipelineActor {
 
         for (name, job) in new_statuses.iter() {
             let job_ref = self.job_statuses.get_mut(name).unwrap();
-            let changed = job_ref.instances_done != *msg.instances_done_counts.get(name).unwrap();
+            let changed =
+                job_ref.instances_done != *msg.instances_done_counts.get(name).unwrap_or(&0);
 
-            job_ref.mq_input_channel_count = *msg.mq_input_channel_counts.get(name).unwrap();
-            job_ref.instances_done = *msg.instances_done_counts.get(name).unwrap();
+            job_ref.mq_input_channel_count =
+                *msg.mq_input_channel_counts.get(name).unwrap_or(&None);
+            job_ref.instances_done = *msg.instances_done_counts.get(name).unwrap_or(&0);
 
             if changed {
                 debug!("Status changed for  : \t{}", name);

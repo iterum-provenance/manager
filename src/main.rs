@@ -9,10 +9,14 @@ use std::env;
 
 mod config;
 mod error;
-mod pipelines;
+mod kube;
+mod mq;
+mod pipeline;
+mod provenance_tracker;
+mod routes;
 
-use crate::pipelines::message_queue::actor::MessageQueueActor;
-use crate::pipelines::pipeline_manager::PipelineManager;
+// use crate::pipelines::message_queue::actor::MessageQueueActor;
+// use crate::pipelines::pipeline_manager::PipelineManager;
 
 use actix::prelude::*;
 use std::collections::HashMap;
@@ -30,14 +34,14 @@ async fn main() -> std::io::Result<()> {
     // };
     // let addr = manager.start();
 
-    let mq_actor = MessageQueueActor {
-        queue_counts: HashMap::new(),
-    };
-    let mq_actor_addr = mq_actor.start();
+    // let mq_actor = MessageQueueActor {
+    //     queue_counts: HashMap::new(),
+    // };
+    // let mq_actor_addr = mq_actor.start();
 
     let config = web::Data::new(config::Config {
         // manager: addr,
-        mq_actor: mq_actor_addr,
+        // mq_actor: mq_actor_addr,
         addresses: RwLock::new(HashMap::new()),
     });
 
@@ -53,7 +57,7 @@ async fn main() -> std::io::Result<()> {
                 )
                 .into()
             }))
-            .configure(pipelines::init_routes)
+            .configure(routes::init_routes)
     });
 
     server = match listenfd.take_tcp_listener(0)? {

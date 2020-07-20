@@ -1,6 +1,6 @@
 // pub struct PipelineActor {
 //     pub mq_actor: Addr<MessageQueueActor>,
-//     pub pipeline_job: PipelineJob,
+//     pub pipeline_job: PipelineRun,
 //     pub statuses: HashMap<String, bool>,
 //     pub first_node_upstream_map: HashMap<String, String>,
 //     pub instances_per_job: HashMap<String, usize>,
