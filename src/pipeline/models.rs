@@ -1,14 +1,12 @@
-// pub struct PipelineActor {
-//     pub mq_actor: Addr<MessageQueueActor>,
-//     pub pipeline_job: PipelineRun,
-//     pub statuses: HashMap<String, bool>,
-//     pub first_node_upstream_map: HashMap<String, String>,
-//     pub instances_per_job: HashMap<String, usize>,
-//     pub instances_done_counts: HashMap<String, usize>,
-//     pub mq_input_channel_counts: HashMap<String, usize>,
-//     pub lineage_map: HashMap<String, FragmentLineage>,
-// }
+// use crate::pipeline::actor::PipelineActor;
+// use actix::prelude::Addr;
+// use iterum_rust::pipeline::PipelineRun;
+use iterum_rust::pipeline::StepStatus;
 use std::collections::HashMap;
+
+// pub struct PipelineInfo {
+//     pub actor: Option<Addr<PipelineActor>>,
+// }
 
 #[derive(Debug, Clone)]
 pub struct JobStatus {
@@ -16,6 +14,16 @@ pub struct JobStatus {
     pub instances_in_job: usize,
     pub instances_done: usize,
     pub mq_input_channel_count: Option<usize>,
+}
+
+impl From<JobStatus> for StepStatus {
+    fn from(status: JobStatus) -> StepStatus {
+        if status.is_done() {
+            StepStatus::Succeeded
+        } else {
+            StepStatus::Running
+        }
+    }
 }
 
 impl JobStatus {

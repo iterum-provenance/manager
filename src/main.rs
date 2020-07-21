@@ -8,6 +8,7 @@ use listenfd::ListenFd;
 use std::env;
 
 mod config;
+mod daemon;
 mod error;
 mod kube;
 mod mq;

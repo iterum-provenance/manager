@@ -1,6 +1,7 @@
 use crate::config;
 use crate::error::ManagerError;
 use crate::kube::KubeAPI;
+use iterum_rust::pipeline::PipelineExecution;
 // use crate::pipelines::messages::JobStatusMessage;
 // use crate::pipelines::pipeline_manager::RequestAddress;
 use actix_web::{delete, get, post, web, HttpResponse};
@@ -10,10 +11,86 @@ use serde_json::json;
 use std::collections::HashMap;
 
 use crate::pipeline::actor::PipelineActor;
-// use crate::pipelines::pipeline_manager::NewPipelineMessage;
-use crate::provenance_tracker::actor::LineageActor;
+use crate::pipeline::messages::PipelineStatusMessage;
+// use crate::provenance_tracker::actor::LineageActor;
 
 use actix::prelude::*;
+
+#[get("/pipelines")]
+async fn get_pipelines(config: web::Data<config::Config>) -> Result<HttpResponse, ManagerError> {
+    let mut stopped_pipelines: Vec<String> = Vec::new();
+    let mut active_pipelines: Vec<String> = Vec::new();
+    {
+        let read_lock = config.addresses.read().unwrap();
+
+        for (key, address) in read_lock.iter() {
+            let result = match address.send(PipelineStatusMessage {}).await {
+                Ok(_) => true,
+                Err(err) => match err {
+                    MailboxError::Closed => false,
+                    MailboxError::Timeout => true,
+                },
+            };
+            if result {
+                active_pipelines.push(key.clone())
+            } else {
+                stopped_pipelines.push(key.clone())
+            }
+        }
+    }
+    {
+        let mut write_lock = config.addresses.write().unwrap();
+        for stopped_pipeline in stopped_pipelines.iter() {
+            write_lock.remove(stopped_pipeline);
+        }
+    }
+    Ok(HttpResponse::Ok().json(active_pipelines))
+}
+
+#[get("/pipelines/{}")]
+async fn get_pipeline(
+    config: web::Data<config::Config>,
+    pipeline_hash: web::Path<String>,
+) -> Result<HttpResponse, ManagerError> {
+    let pipeline_hash = pipeline_hash.into_inner();
+
+    let read_lock = config.addresses.read().unwrap();
+    let pipeline_execution_str = match read_lock.get(&pipeline_hash) {
+        Some(address) => match address.send(PipelineStatusMessage {}).await {
+            Ok(result) => Some(result),
+            Err(err) => None,
+        },
+        None => None,
+    };
+
+    if result {
+        active_pipelines.push(key.clone())
+    } else {
+        stopped_pipelines.push(key.clone())
+    }
+
+    //     for (key, address) in read_lock.iter() {
+    //         let result = match address.send(PipelineStatusMessage {}).await {
+    //             Ok(_) => true,
+    //             Err(err) => match err {
+    //                 MailboxError::Closed => false,
+    //                 MailboxError::Timeout => true,
+    //             },
+    //         };
+    //         if result {
+    //             active_pipelines.push(key.clone())
+    //         } else {
+    //             stopped_pipelines.push(key.clone())
+    //         }
+    //     }
+    // }
+    // {
+    //     let mut write_lock = config.addresses.write().unwrap();
+    //     for stopped_pipeline in stopped_pipelines.iter() {
+    //         write_lock.remove(stopped_pipeline);
+    //     }
+    Ok(HttpResponse::Ok().json(active_pipelines))
+}
 
 #[post("/submit_pipeline_actor")]
 async fn submit_pipeline_actor(
@@ -29,37 +106,12 @@ async fn submit_pipeline_actor(
 
     // Check whether pipeline is valid
     if pipeline.is_valid() {
-        let pipeline_run = pipeline.clone();
-        let job_statuses = crate::kube::misc::create_job_statuses(
-            pipeline_run,
-            pipeline.create_first_node_upstream_map(),
-        );
-
-        // let lineage_actor = ;
-        let pipeline_hash = pipeline.clone().pipeline_run_hash;
-        let lineage_actor = LineageActor {
-            pipeline_run_hash: pipeline_hash,
-            channel: None,
-        };
-        // Arbiter::spawn(future: F)()
-        // let lineage_addr = SyncArbiter::start(1, move || );
-
-        let lineage_addr = lineage_actor.start();
-        let actor = PipelineActor {
-            // mq_actor: config.mq_actor.clone(),
-            pipeline_job: pipeline.clone(),
-            lineage_actor: lineage_addr,
-            mq_channel_counts: HashMap::new(),
-            job_statuses,
-        };
+        let actor = PipelineActor::new(pipeline.clone());
         let address = actor.start();
-        let mut write_lock = config.addresses.write().unwrap();
-        write_lock.insert(pipeline.pipeline_run_hash.to_string(), address);
-        // let result = config.manager.send(NewPipelineMessage {
-        //     pipeline_run_hash: pipeline.pipeline_run_hash.to_string(),
-        //     address,
-        // });
-        // result.await.unwrap();
+        {
+            let mut write_lock = config.addresses.write().unwrap();
+            write_lock.insert(pipeline.pipeline_run_hash.to_string(), address);
+        }
         Ok(HttpResponse::Ok().json(pipeline))
     } else {
         Ok(HttpResponse::Conflict().json(json!({"message":"Pipeline is not valid."})))
@@ -76,11 +128,12 @@ async fn delete_pipelines(config: web::Data<config::Config>) -> Result<HttpRespo
     use crate::pipeline::actor::StopMessage;
 
     for kv in write_lock.iter().enumerate() {
-        let (name, address) = kv.1;
+        let (_, address) = kv.1;
         address
             .send(StopMessage {})
             .await
-            .map_err(|_| warn!("Actor does not exist."));
+            .map_err(|_| warn!("Actor does not exist."))
+            .unwrap();
     }
     write_lock.clear();
 
@@ -96,6 +149,6 @@ async fn list_queues() -> Result<HttpResponse, ManagerError> {
 #[get("/delete_queues")]
 async fn delete_all_queues() -> Result<HttpResponse, ManagerError> {
     info!("Deleting all queues");
-    let queue_info = crate::mq::RabbitMqAPI::delete_all_queues().await;
+    crate::mq::RabbitMqAPI::delete_all_queues().await;
     Ok(HttpResponse::Ok().finish())
 }

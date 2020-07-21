@@ -50,7 +50,7 @@ pub fn fragmenter(pipeline_job: &PipelineRun) -> Job {
     env_config.insert("config".to_owned(), serde_json::to_value(&global_config).unwrap());
     env_config.insert("config_files_all".to_owned(), serde_json::to_value(config_files_all).unwrap());
 
-    let interum_config = serde_json::to_string(&env_config).unwrap();
+    let iterum_config = serde_json::to_string(&env_config).unwrap();
     let local_config2 = serde_json::to_string(&global_config).unwrap();
 
     let job: Job = serde_json::from_value(json!({
@@ -99,7 +99,7 @@ pub fn fragmenter(pipeline_job: &PipelineRun) -> Job {
                             
                             {"name": "FRAGMENTER_INPUT", "value": "tts.sock"},
                             {"name": "FRAGMENTER_OUTPUT", "value": "fts.sock"},
-                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG", "value": &iterum_config},
                             {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{

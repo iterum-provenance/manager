@@ -1,32 +1,51 @@
-use actix::prelude::*;
-use iterum_rust::pipeline::PipelineRun;
-// use actix::Addr;
 use super::messages::KubeJobStatusMessage;
 use crate::kube::KubeAPI;
 use crate::mq::RabbitMqAPI;
-// use crate::pipelines::message_queue::actor::MessageQueueActor;
-// use crate::pipelines::message_queue::messages::GetAllQueueCountsMessage;
-use iterum_rust::provenance::FragmentLineage;
-
 use crate::pipeline::models::JobStatus;
 use crate::provenance_tracker::actor::LineageActor;
+use actix::prelude::*;
 use futures::join;
+use iterum_rust::pipeline::PipelineRun;
+use iterum_rust::pipeline::{PipelineExecution, StepStatus};
 use std::collections::HashMap;
 use std::time::Duration;
 
 pub struct PipelineActor {
     pub pipeline_job: PipelineRun,
-    // pub statuses: HashMap<String, bool>,
-    // pub first_node_upstream_map: HashMap<String, String>,
-    // pub instances_per_job: HashMap<String, usize>,
-    // pub instances_done_counts: HashMap<String, usize>,
-    // pub lineage_map: HashMap<String, FragmentLineage>,
     pub mq_channel_counts: HashMap<String, usize>,
     pub job_statuses: HashMap<String, JobStatus>,
-    pub lineage_actor: Addr<LineageActor>,
+    pub lineage_actor: Option<Addr<LineageActor>>,
 }
 
-impl PipelineActor {}
+impl PipelineActor {
+    pub fn new(pipeline_run: PipelineRun) -> PipelineActor {
+        let job_statuses = crate::kube::misc::create_job_statuses(
+            pipeline_run.clone(),
+            pipeline_run.create_first_node_upstream_map(),
+        );
+
+        PipelineActor {
+            pipeline_job: pipeline_run,
+            lineage_actor: None,
+            mq_channel_counts: HashMap::new(),
+            job_statuses,
+        }
+    }
+
+    pub fn create_pipeline_execution(&self) -> PipelineExecution {
+        let mut statuses: HashMap<String, StepStatus> = HashMap::new();
+
+        for (key, value) in &self.job_statuses {
+            statuses.insert(key.to_string(), value.clone().into());
+        }
+
+        PipelineExecution {
+            pipeline_run: self.pipeline_job.clone(),
+            status: statuses,
+            results: None,
+        }
+    }
+}
 
 impl Actor for PipelineActor {
     type Context = Context<Self>;
@@ -38,14 +57,32 @@ impl Actor for PipelineActor {
         ctx.run_interval(Duration::from_millis(10000), |act, context| {
             Arbiter::spawn(get_jobs_status(act.pipeline_job.clone(), context.address()));
         });
+
+        info!("Start provenance tracking actor");
+        let lineage_actor = LineageActor {
+            pipeline_run_hash: self.pipeline_job.clone().pipeline_run_hash,
+            channel: None,
+        };
+        let lineage_addr = lineage_actor.start();
+        self.lineage_actor = Some(lineage_addr);
+
+        info!("Creating pipeline execution on daemon");
+        let pe = self.create_pipeline_execution();
+        Arbiter::spawn(crate::daemon::api::store_pipeline_execution(pe));
+
         info!("Spawn submission of pipeline");
         Arbiter::spawn(KubeAPI::submit(self.pipeline_job.clone()));
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         info!("Pipeline actor is stopped");
+
+        info!("Updating pipeline execution on daemon");
+        let pe = self.create_pipeline_execution();
+        Arbiter::spawn(crate::daemon::api::store_pipeline_execution(pe));
+
         Arbiter::spawn(send_stop_message_to_lineage_tracker(
-            self.lineage_actor.clone(),
+            self.lineage_actor.clone().unwrap(),
         ));
     }
 }

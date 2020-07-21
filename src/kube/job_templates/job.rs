@@ -21,7 +21,7 @@ pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
     global_config.config.extend(local_config.config);
     global_config.config_files.extend(local_config.config_files);
 
-    let interum_config = serde_json::to_string(&global_config).unwrap();
+    let iterum_config = serde_json::to_string(&global_config).unwrap();
     let mq_prefetch_count_string = match step.prefetch_count {
         Some(count) => count.to_string(),
         None => String::from(""),
@@ -75,7 +75,7 @@ pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
 
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
-                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG", "value": &iterum_config},
                             {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{
@@ -90,7 +90,7 @@ pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
                             {"name": "DATA_VOLUME_PATH", "value": "/data-volume"},
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
-                            {"name": "ITERUM_CONFIG", "value": &interum_config},
+                            {"name": "ITERUM_CONFIG", "value": &iterum_config},
                             {"name": "ITERUM_CONFIG_PATH", "value": "config"},
                         ],
                         "volumeMounts": [{

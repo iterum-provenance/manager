@@ -55,6 +55,8 @@ pub fn combiner(pipeline_job: &PipelineRun) -> Job {
                             {"name": "TRANSFORMATION_STEP_INPUT", "value": "tts.sock"},
                             {"name": "TRANSFORMATION_STEP_OUTPUT", "value": "fts.sock"},
 
+                            {"name": "ITERUM_CONFIG_PATH", "value": "config"},
+
                         ]
                     }],
                     "restartPolicy": "Never"
