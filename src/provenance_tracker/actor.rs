@@ -2,7 +2,6 @@ use crate::daemon;
 use actix::prelude::*;
 use futures_util::stream::StreamExt;
 use iterum_rust::pipeline::PipelineRun;
-use iterum_rust::provenance::FragmentLineage;
 use lapin::{options::*, types::FieldTable, Channel, Connection, ConnectionProperties};
 use std::env;
 

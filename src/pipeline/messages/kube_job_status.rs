@@ -15,10 +15,10 @@ impl Message for KubeJobStatusMessage {
 impl Handler<KubeJobStatusMessage> for PipelineActor {
     type Result = bool;
 
-    fn handle(&mut self, msg: KubeJobStatusMessage, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: KubeJobStatusMessage, _ctx: &mut Context<Self>) -> Self::Result {
         let new_statuses = self.job_statuses.clone();
 
-        for (name, job) in new_statuses.iter() {
+        for (name, _job) in new_statuses.iter() {
             let job_ref = self.job_statuses.get_mut(name).unwrap();
             let changed =
                 job_ref.instances_done != *msg.instances_done_counts.get(name).unwrap_or(&0);

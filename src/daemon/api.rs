@@ -1,7 +1,7 @@
-use base64::encode;
-use hyper::header::AUTHORIZATION;
+
+
 use hyper::Client;
-use hyper::StatusCode;
+
 use hyper::{Body, Method, Request};
 use iterum_rust::pipeline::PipelineExecution;
 use iterum_rust::pipeline::PipelineRun;

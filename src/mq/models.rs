@@ -9,7 +9,7 @@ pub struct RabbitMqAPI {}
 
 impl RabbitMqAPI {
     pub async fn get_message_queue_counts(
-        pipeline_job: &PipelineRun,
+        _pipeline_job: &PipelineRun,
     ) -> HashMap<String, Option<usize>> {
         // Get queue counts..
         RabbitMqAPI::get_all_queues().await
