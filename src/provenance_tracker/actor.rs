@@ -1,12 +1,14 @@
+use crate::daemon;
 use actix::prelude::*;
 use futures_util::stream::StreamExt;
+use iterum_rust::pipeline::PipelineRun;
 use iterum_rust::provenance::FragmentLineage;
 use lapin::{options::*, types::FieldTable, Channel, Connection, ConnectionProperties};
 use std::env;
 
 // This actor consumes lineage messages from the queue and redirects it to the daemon (storage backend)
 pub struct LineageActor {
-    pub pipeline_run_hash: String,
+    pub pipeline_run: PipelineRun,
     pub channel: Option<Channel>,
 }
 
@@ -16,13 +18,21 @@ impl Actor for LineageActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        info!("Lineage actor started for {}", self.pipeline_run_hash);
+        info!(
+            "Lineage actor started for {}",
+            self.pipeline_run.pipeline_run_hash
+        );
 
-        let queue_name = format!("{}-lineage", self.pipeline_run_hash);
+        let queue_name = format!("{}-lineage", self.pipeline_run.pipeline_run_hash);
         info!("Lineage actor will listen to {}", queue_name);
         let broker_url = env::var("MQ_BROKER_URL").unwrap();
         // let executor = ThreadPool::new().unwrap();
-        Arbiter::spawn(setup_mq_listener(queue_name, broker_url, ctx.address()));
+        Arbiter::spawn(setup_mq_listener(
+            self.pipeline_run.clone(),
+            queue_name,
+            broker_url,
+            ctx.address(),
+        ));
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
@@ -37,7 +47,12 @@ impl Actor for LineageActor {
     }
 }
 
-async fn setup_mq_listener(queue_name: String, broker_url: String, address: Addr<LineageActor>) {
+async fn setup_mq_listener(
+    pipeline_run: PipelineRun,
+    queue_name: String,
+    broker_url: String,
+    address: Addr<LineageActor>,
+) {
     let conn = Connection::connect(
         &broker_url,
         ConnectionProperties::default().with_default_executor(8),
@@ -74,11 +89,26 @@ async fn setup_mq_listener(queue_name: String, broker_url: String, address: Addr
     Arbiter::spawn(async move {
         info!("Started listening to queue {}", queue_name);
         while let Some(delivery) = consumer.next().await {
-            let (channel, delivery) = delivery.expect("error in consumer");
-            // info!("Received [{:?}]", delivery.data);
-            let lineage_info: FragmentLineage = serde_json::from_slice(&delivery.data).unwrap();
-            info!("sending lineage data to daemon [{:?}]", lineage_info);
-            info!("Not actually sending yet..");
+            let (channel, delivery) = match delivery {
+                Ok(delivery) => delivery,
+                Err(e) => {
+                    info!("Channel closed: {}", e);
+                    continue;
+                }
+            };
+            info!("Received [{:?}]", delivery.data);
+            match serde_json::from_slice(&delivery.data) {
+                Ok(result) => {
+                    info!("sending lineage data to daemon [{:?}]", result);
+                    info!("Not actually sending yet..");
+                    daemon::api::store_fragment_lineage(&pipeline_run, result).await;
+                }
+                Err(_) => {
+                    warn!("Error deserializing fragment lineage.");
+                    continue;
+                }
+            };
+
             channel
                 .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
                 .await

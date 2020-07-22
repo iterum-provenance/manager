@@ -60,7 +60,7 @@ impl Actor for PipelineActor {
 
         info!("Start provenance tracking actor");
         let lineage_actor = LineageActor {
-            pipeline_run_hash: self.pipeline_job.clone().pipeline_run_hash,
+            pipeline_run: self.pipeline_job.clone(),
             channel: None,
         };
         let lineage_addr = lineage_actor.start();
