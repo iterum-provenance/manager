@@ -26,7 +26,6 @@ impl Actor for LineageActor {
         let queue_name = format!("{}-lineage", self.pipeline_run.pipeline_run_hash);
         info!("Lineage actor will listen to {}", queue_name);
         let broker_url = env::var("MQ_BROKER_URL").unwrap();
-        // let executor = ThreadPool::new().unwrap();
         Arbiter::spawn(setup_mq_listener(
             self.pipeline_run.clone(),
             queue_name,
@@ -38,12 +37,12 @@ impl Actor for LineageActor {
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         info!("Lineage actor is stopped");
 
-        // Arbiter::spawn
-        // let channel = self.channel.clone();
         self.channel
             .as_ref()
             .unwrap()
-            .basic_cancel("lineage_tracker", BasicCancelOptions::default());
+            .basic_cancel("lineage_tracker", BasicCancelOptions::default())
+            .wait()
+            .unwrap();
     }
 }
 

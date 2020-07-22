@@ -16,10 +16,6 @@ mod pipeline;
 mod provenance_tracker;
 mod routes;
 
-// use crate::pipelines::message_queue::actor::MessageQueueActor;
-// use crate::pipelines::pipeline_manager::PipelineManager;
-
-use actix::prelude::*;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -29,20 +25,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let mut listenfd = ListenFd::from_env();
-
-    // let manager = PipelineManager {
-    //     addresses: HashMap::new(),
-    // };
-    // let addr = manager.start();
-
-    // let mq_actor = MessageQueueActor {
-    //     queue_counts: HashMap::new(),
-    // };
-    // let mq_actor_addr = mq_actor.start();
-
     let config = web::Data::new(config::Config {
-        // manager: addr,
-        // mq_actor: mq_actor_addr,
         addresses: RwLock::new(HashMap::new()),
     });
 

@@ -6,8 +6,6 @@ use hyper::{Body, Method, Request};
 use iterum_rust::pipeline::PipelineExecution;
 use iterum_rust::pipeline::PipelineRun;
 use iterum_rust::provenance::FragmentLineage;
-use serde_json::value::Value;
-use std::collections::HashMap;
 
 fn daemon_url() -> String {
     "http://daemon-service:3000".to_string()
