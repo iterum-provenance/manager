@@ -22,3 +22,11 @@ Additionally there are the following modules:
 
 
 These top-level modules are further split into submodules. This is further explained in the lower-level code documentation. The command `cargo doc --no-deps --open` can be run to compile the documentation for this project. The command opens up a browsable site where the code documentation for each module can be read.
+
+# Building of the software artifact
+
+The Manager can be build to be used in a Kubernetes cluster by building the docker image. This can be done using the following command:
+
+```
+docker build -t manager:<TAG> .
+```
