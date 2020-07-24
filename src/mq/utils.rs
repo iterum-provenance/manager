@@ -1,3 +1,4 @@
+//! Contains helper functions to extract queue counts in the correct format for the manager
 use base64::encode;
 use hyper::header::AUTHORIZATION;
 use hyper::Client;
@@ -5,11 +6,8 @@ use hyper::{Body, Method, Request};
 use serde_json::value::Value;
 use std::collections::HashMap;
 
-pub async fn get_queues(
-    url: String,
-    username: String,
-    password: String,
-) -> HashMap<String, Option<usize>> {
+/// Converts the message retrieved from the RabbitMQ admin to a hashmap mapping queue name to a count
+pub async fn get_queues(url: String, username: String, password: String) -> HashMap<String, Option<usize>> {
     let client = Client::new();
 
     let credentials_encoded = encode(format!("{}:{}", username, password));
@@ -21,10 +19,7 @@ pub async fn get_queues(
         .body(Body::from(""))
         .unwrap();
 
-    let resp = client
-        .request(req)
-        .await
-        .expect("Was unable to reach RabbitMQ.");
+    let resp = client.request(req).await.expect("Was unable to reach RabbitMQ.");
 
     let bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
     let string = std::str::from_utf8(&bytes).unwrap();

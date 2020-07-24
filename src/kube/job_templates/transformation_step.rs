@@ -1,37 +1,40 @@
+//! Contains template to use for the creation of jobs a transformation step
+
 use iterum_rust::pipeline::PipelineRun;
 use iterum_rust::pipeline::TransformationStep;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
-pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
+/// Functions which creates a specific transformation step Kubernetes job from a pipeline run.
+pub fn transformation_step(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
+    // Create some variables to be passed to the job
     let name = format!("{}-{}", pipeline_job.pipeline_run_hash, step.name);
     let outputbucket = format!("{}-output", &name);
-    let input_channel = format!(
-        "{}-{}",
-        &pipeline_job.pipeline_run_hash, &step.input_channel
-    );
-    let output_channel = format!(
-        "{}-{}",
-        &pipeline_job.pipeline_run_hash, &step.output_channel
-    );
+    let input_channel = format!("{}-{}", &pipeline_job.pipeline_run_hash, &step.input_channel);
+    let output_channel = format!("{}-{}", &pipeline_job.pipeline_run_hash, &step.output_channel);
 
+    // Construct a config to be passed to the job
     let local_config = step.config.clone();
     let mut global_config = pipeline_job.config.clone();
     global_config.config.extend(local_config.config);
     global_config.config_files.extend(local_config.config_files);
 
+    // Combine the extracted configs in the correct manner
     let iterum_config = serde_json::to_string(&global_config).unwrap();
+
+    // Also create a prefetch count value
     let mq_prefetch_count_string = match step.prefetch_count {
         Some(count) => count.to_string(),
         None => String::from(""),
     };
 
+    // Create the actual job
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": { "name": name, "labels": {
-            "pipeline_run_hash": pipeline_job.pipeline_run_hash,                     
+            "pipeline_run_hash": pipeline_job.pipeline_run_hash,
             "input_channel": input_channel,
             "output_channel": output_channel
         } },
@@ -102,6 +105,7 @@ pub fn job(pipeline_job: &PipelineRun, step: &TransformationStep) -> Job {
                 }
             }
         }
-    })).unwrap();
+    }))
+    .unwrap();
     job
 }

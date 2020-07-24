@@ -1,14 +1,19 @@
+//! Contains template to use for the creation of jobs a combiner
 use iterum_rust::pipeline::PipelineRun;
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 use std::env;
 
+/// Functions which creates a combiner Kubernetes job from a pipeline run.
 pub fn combiner(pipeline_job: &PipelineRun) -> Job {
+    // Create some variables to be passed to the job
     let hash = format!("{}-combiner", &pipeline_job.pipeline_run_hash);
     let input_channel = format!(
         "{}-{}",
         &pipeline_job.pipeline_run_hash, &pipeline_job.combiner.input_channel
     );
+
+    // Create the actual job
     let job: Job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",

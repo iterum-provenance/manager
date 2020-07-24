@@ -1,3 +1,5 @@
+//!
+
 use crate::pipelines::actor::PipelineActor;
 use crate::pipelines::provenance::models::FragmentLineage;
 use actix::prelude::*;
@@ -17,8 +19,6 @@ impl Handler<FragmentLineageMessage> for PipelineActor {
     fn handle(&mut self, msg: FragmentLineageMessage, _ctx: &mut Context<Self>) -> Self::Result {
         // info!("Received lineage for fragment: {}", msg.fragment_id);
 
-        self.lineage_map
-            .insert(msg.fragment_id, msg.fragment_lineage)
-            .is_none()
+        self.lineage_map.insert(msg.fragment_id, msg.fragment_lineage).is_none()
     }
 }

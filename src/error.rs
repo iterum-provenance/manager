@@ -1,9 +1,11 @@
+//! The various errors that the manager produces, and the corresponding From<T> functions are in this module.
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
 
+/// Various errors can be cast to this error, and this error can then in-turn be cast into an HttpResponse for endpoints.
 #[derive(Debug)]
 pub enum ManagerError {
     KubeApi(kube::error::Error),

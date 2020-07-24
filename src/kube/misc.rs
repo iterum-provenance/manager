@@ -1,6 +1,6 @@
-use iterum_rust::pipeline::PipelineRun;
-
+//! Miscellaneous functions with regards to kubernetes jobs.
 use crate::pipeline::models::JobStatus;
+use iterum_rust::pipeline::PipelineRun;
 use std::collections::HashMap;
 
 pub fn create_job_statuses(

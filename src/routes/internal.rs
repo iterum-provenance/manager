@@ -1,9 +1,11 @@
+//! The internal routes are used by the pipeline artifact.
 use crate::config;
 use crate::error::ManagerError;
 use crate::pipeline::messages::JobStatusMessage;
 use actix_web::{get, web, HttpResponse};
 use serde_json::json;
 
+/// Endpoint used by the sidecars in the pipeline jobs to check whether the pods in that step can terminate.
 #[get("/pipeline/{pipeline_run_hash}/{step_name}/upstream_finished")]
 async fn is_upstream_finished(
     config: web::Data<config::Config>,
