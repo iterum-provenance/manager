@@ -1,29 +1,47 @@
-# ------------------------------------------------------------------------------
-# Cargo Build Stage
-# ------------------------------------------------------------------------------
+####################################################################################################
+## Builder
+####################################################################################################
+FROM rust:latest AS builder
 
-FROM rust:latest as cargo-build
-RUN apt-get update
-RUN apt-get install musl-tools -y
 RUN rustup target add x86_64-unknown-linux-musl
-WORKDIR /usr/src/manager
-COPY Cargo.toml Cargo.toml
-RUN mkdir src/
-RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
-RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --target=x86_64-unknown-linux-musl
-RUN rm -f target/x86_64-unknown-linux-musl/release/deps/manager*
-COPY src src
-RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --target=x86_64-unknown-linux-musl
+RUN apt update && apt install -y musl-tools musl-dev
+RUN update-ca-certificates
 
-# ------------------------------------------------------------------------------
-# Final Stage
-# ------------------------------------------------------------------------------
+# Create appuser
+ENV USER=manager
+ENV UID=10001
 
-FROM alpine:latest
-RUN addgroup -g 1000 manager
-RUN adduser -D -s /bin/sh -u 1000 -G manager manager
-WORKDIR /home/manager/bin/
-COPY --from=cargo-build /usr/src/manager/target/x86_64-unknown-linux-musl/release/manager .
-RUN chown manager:manager manager
-USER manager
-CMD ["./manager"]
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    "${USER}"
+
+
+WORKDIR /manager
+
+COPY ./ .
+
+RUN cargo build --target x86_64-unknown-linux-musl --release
+
+####################################################################################################
+## Final image
+####################################################################################################
+FROM scratch
+
+# Import from builder.
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+WORKDIR /manager
+
+# Copy our build
+COPY --from=builder /manager/target/x86_64-unknown-linux-musl/release/manager ./
+
+# Use an unprivileged user.
+USER manager:manager
+
+CMD ["/manager/manager"]

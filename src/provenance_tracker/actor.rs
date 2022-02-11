@@ -71,6 +71,11 @@ async fn setup_mq_listener(
         .await
         .unwrap();
 
+    let _queue = channel
+        .queue_declare(&queue_name, QueueDeclareOptions::default(), FieldTable::default())
+        .await
+        .unwrap();
+
     // Set up consumer
     let mut consumer = channel
         .basic_consume(
